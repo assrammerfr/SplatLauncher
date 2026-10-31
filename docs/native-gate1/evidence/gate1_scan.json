@@ -1,0 +1,678 @@
+{
+ "modules": {
+  "rtld": {
+   "size": 10109,
+   "flags": "0x3f",
+   "build_id": "263C3426D28AF8D8CCE29A9D2DA8FF0FF9A76456",
+   "build_id_matches_bootlog": true,
+   "segments": [
+    {
+     "name": "text",
+     "mem": "0x0",
+     "size": "0x2540",
+     "csize": "0x1e28",
+     "compressed": true
+    },
+    {
+     "name": "ro",
+     "mem": "0x3000",
+     "size": "0xa2c",
+     "csize": "0x6e9",
+     "compressed": true
+    },
+    {
+     "name": "data",
+     "mem": "0x4000",
+     "size": "0x1008",
+     "csize": "0x165",
+     "compressed": true
+    }
+   ],
+   "bss_size": "0xff8",
+   "mod0": {
+    "mod0_vaddr": "0x301c",
+    "dynamic_rel": "0xfec",
+    "bss_start_rel": "0x1ff4",
+    "bss_end_rel": "0x20fc",
+    "eh_frame_hdr_start_rel": "0x500",
+    "eh_frame_hdr_end_rel": "0x614"
+   },
+   "dynamic": [
+    {
+     "tag": "0xe",
+     "val": "0x4a"
+    },
+    {
+     "tag": "DT_FLAGS",
+     "val": "0x8"
+    },
+    {
+     "tag": "0x6ffffffb",
+     "val": "0x1"
+    },
+    {
+     "tag": "DT_RELA",
+     "val": "0x3060"
+    },
+    {
+     "tag": "DT_RELASZ",
+     "val": "0x18"
+    },
+    {
+     "tag": "DT_RELAENT",
+     "val": "0x18"
+    },
+    {
+     "tag": "0x24",
+     "val": "0x3090"
+    },
+    {
+     "tag": "0x23",
+     "val": "0x18"
+    },
+    {
+     "tag": "0x25",
+     "val": "0x8"
+    },
+    {
+     "tag": "DT_JMPREL",
+     "val": "0x3078"
+    },
+    {
+     "tag": "0x2",
+     "val": "0x18"
+    },
+    {
+     "tag": "0x3",
+     "val": "0x42d0"
+    },
+    {
+     "tag": "DT_PLTRELSZ",
+     "val": "0x7"
+    },
+    {
+     "tag": "DT_SYMTAB",
+     "val": "0x30c8"
+    },
+    {
+     "tag": "DT_SYMENT",
+     "val": "0x18"
+    },
+    {
+     "tag": "DT_STRTAB",
+     "val": "0x3110"
+    },
+    {
+     "tag": "DT_STRSZ",
+     "val": "0x55"
+    },
+    {
+     "tag": "DT_GNU_HASH",
+     "val": "0x30a8"
+    },
+    {
+     "tag": "DT_INIT_ARRAY",
+     "val": "0x4000"
+    },
+    {
+     "tag": "DT_INIT_ARRAYSZ",
+     "val": "0x0"
+    },
+    {
+     "tag": "DT_FINI_ARRAY",
+     "val": "0x4000"
+    },
+    {
+     "tag": "DT_FINI_ARRAYSZ",
+     "val": "0x0"
+    },
+    {
+     "tag": "DT_INIT",
+     "val": "0x1d40"
+    },
+    {
+     "tag": "DT_FINI",
+     "val": "0x1ea0"
+    }
+   ],
+   "dynsyms": {
+    "strtab": "0x3110",
+    "symtab": "0x30c8",
+    "strsz": "0x55",
+    "count": 3
+   },
+   "imports": 2,
+   "exports": 0,
+   "nvn_imports": [],
+   "nvn_exports": [],
+   "sample_imports": [
+    "_ZN2nn2os6detail20UserExceptionHandlerEv",
+    "_ZN2nn4init5StartEmmPFvvES2_S2_"
+   ],
+   "sample_exports": [],
+   "eh_frame_hdr_fde_count": 33,
+   "bl_target_count": 23,
+   "nvn_strings_count": 0
+  },
+  "main": {
+   "size": 51866583,
+   "flags": "0x3f",
+   "build_id": "6830B3A12406CB4716FEC5ADDC35D3E2DC92D212",
+   "build_id_matches_bootlog": true,
+   "segments": [
+    {
+     "name": "text",
+     "mem": "0x0",
+     "size": "0x4e8ed10",
+     "csize": "0x28bb5eb",
+     "compressed": true
+    },
+    {
+     "name": "ro",
+     "mem": "0x4e8f000",
+     "size": "0xc37de8",
+     "csize": "0x70e6b7",
+     "compressed": true
+    },
+    {
+     "name": "data",
+     "mem": "0x5ac7000",
+     "size": "0x53db98",
+     "csize": "0x1ace2d",
+     "compressed": true
+    }
+   ],
+   "bss_size": "0x1f3468",
+   "mod0": {
+    "mod0_vaddr": "0x4e8f054",
+    "dynamic_rel": "0x108cff4",
+    "bss_start_rel": "0x1175b6c",
+    "bss_end_rel": "0x1368a94",
+    "eh_frame_hdr_start_rel": "0x2ad960",
+    "eh_frame_hdr_end_rel": "0x4c049c"
+   },
+   "dynamic": [
+    {
+     "tag": "0x1",
+     "val": "0xe493"
+    },
+    {
+     "tag": "0x6ffffffb",
+     "val": "0x8000000"
+    },
+    {
+     "tag": "DT_PLTGOT",
+     "val": "0x0"
+    },
+    {
+     "tag": "DT_RELA",
+     "val": "0x4e8f098"
+    },
+    {
+     "tag": "DT_RELASZ",
+     "val": "0x232c8"
+    },
+    {
+     "tag": "DT_RELAENT",
+     "val": "0x18"
+    },
+    {
+     "tag": "0x24",
+     "val": "0x4eb8d68"
+    },
+    {
+     "tag": "0x23",
+     "val": "0x14658"
+    },
+    {
+     "tag": "0x25",
+     "val": "0x8"
+    },
+    {
+     "tag": "DT_JMPREL",
+     "val": "0x4eb2360"
+    },
+    {
+     "tag": "0x2",
+     "val": "0x6a08"
+    },
+    {
+     "tag": "0x3",
+     "val": "0x5f61fe8"
+    },
+    {
+     "tag": "DT_PLTRELSZ",
+     "val": "0x7"
+    },
+    {
+     "tag": "DT_SYMTAB",
+     "val": "0x4ecfe58"
+    },
+    {
+     "tag": "DT_SYMENT",
+     "val": "0x18"
+    },
+    {
+     "tag": "DT_STRTAB",
+     "val": "0x4ed7790"
+    },
+    {
+     "tag": "DT_STRSZ",
+     "val": "0xe49d"
+    },
+    {
+     "tag": "DT_GNU_HASH",
+     "val": "0x4ecfc30"
+    },
+    {
+     "tag": "DT_HASH",
+     "val": "0x4ecd3c0"
+    },
+    {
+     "tag": "DT_INIT_ARRAY",
+     "val": "0x5ac7000"
+    },
+    {
+     "tag": "DT_INIT_ARRAYSZ",
+     "val": "0xd3b8"
+    },
+    {
+     "tag": "DT_FINI_ARRAY",
+     "val": "0x5ad43b8"
+    },
+    {
+     "tag": "DT_FINI_ARRAYSZ",
+     "val": "0x0"
+    },
+    {
+     "tag": "DT_INIT",
+     "val": "0x20"
+    },
+    {
+     "tag": "DT_FINI",
+     "val": "0x180"
+    }
+   ],
+   "dynsyms": {
+    "strtab": "0x4ed7790",
+    "symtab": "0x4ecfe58",
+    "strsz": "0xe49d",
+    "count": 1293
+   },
+   "imports": 1210,
+   "exports": 82,
+   "nvn_imports": [
+    "nvnBootstrapLoader",
+    "nvnPrivate0"
+   ],
+   "nvn_exports": [],
+   "sample_imports": [
+    "_Unwind_Resume",
+    "_ZN2nn2ec24ShowShopAddOnContentListEv",
+    "_ZN2nn2fs10CreateFileEPKcl",
+    "_ZN2nn2fs10DeleteFileEPKc",
+    "_ZN2nn2fs11GetFileSizeEPlNS0_10FileHandleE",
+    "_ZN2nn2fs11SetFileSizeENS0_10FileHandleEl",
+    "_ZN2nn2fs12GetEntryTypeEPNS0_18DirectoryEntryTypeEPKc",
+    "_ZN2nn2fs13MountSaveDataEPKcRKNS_7account3UidE",
+    "_ZN2nn2fs13OpenDirectoryEPNS0_15DirectoryHandleEPKci",
+    "_ZN2nn2fs13ReadDirectoryEPlPNS0_14DirectoryEntryENS0_15DirectoryHandleEl",
+    "_ZN2nn2fs14CloseDirectoryENS0_15DirectoryHandleE",
+    "_ZN2nn2fs15CreateDirectoryEPKc",
+    "_ZN2nn2fs17MountAddOnContentEPKciPvm",
+    "_ZN2nn2fs17MountCacheStorageEPKc",
+    "_ZN2nn2fs18IsSaveDataExistingENS_13ApplicationIdERKNS_7account3UidE",
+    "_ZN2nn2fs21MountSaveDataReadOnlyEPKcNS_13ApplicationIdERKNS_7account3UidE",
+    "_ZN2nn2fs22GetDirectoryEntryCountEPlNS0_15DirectoryHandleE",
+    "_ZN2nn2fs22QueryMountRomCacheSizeEPm",
+    "_ZN2nn2fs25EnableGlobalFileDataCacheEPvm",
+    "_ZN2nn2fs25GetCurrentThreadFsContextEv",
+    "_ZN2nn2fs25SetCurrentThreadFsContextEPKNS0_9FsContextE",
+    "_ZN2nn2fs26DeleteDirectoryRecursivelyEPKc",
+    "_ZN2nn2fs26SetPriorityOnCurrentThreadENS0_8PriorityE",
+    "_ZN2nn2fs31QueryMountAddOnContentCacheSizeEPmi",
+    "_ZN2nn2fs6CommitEPKc",
+    "_ZN2nn2fs7UnmountEPKc",
+    "_ZN2nn2fs8MountRomEPKc",
+    "_ZN2nn2fs8MountRomEPKcPvm",
+    "_ZN2nn2fs8OpenFileEPNS0_10FileHandleEPKci",
+    "_ZN2nn2fs8ReadFileENS0_10FileHandleElPvm",
+    "_ZN2nn2fs8ReadFileEPmNS0_10FileHandleElPvm",
+    "_ZN2nn2fs8ReadFileEPmNS0_10FileHandleElPvmRKNS0_10ReadOptionE",
+    "_ZN2nn2fs9CloseFileENS0_10FileHandleE",
+    "_ZN2nn2fs9FlushFileENS0_10FileHandleE",
+    "_ZN2nn2fs9IsMountedEPKc",
+    "_ZN2nn2fs9WriteFileENS0_10FileHandleElPKvmRKNS0_11WriteOptionE",
+    "_ZN2nn2oe10InitializeEv",
+    "_ZN2nn2oe14RestartProgramEPKvm",
+    "_ZN2nn2oe15SetCpuBoostModeENS0_12CpuBoostModeE",
+    "_ZN2nn2oe16GetOperationModeEv"
+   ],
+   "sample_exports": [
+    "Libz_SigloMiddlewareInfo",
+    "_ZN2nn6crypto6detail11CtrModeImplINS0_12AesEncryptorILm32EEEE6UpdateEPvmPKvm",
+    "_ZTIN2nn14MemoryResourceE",
+    "_ZTIN2nn4util17IntrusiveListNodeE",
+    "_ZTIN2nn4util21IntrusiveListBaseNodeINS_5async6detail15GroupWaitHolderES4_EE",
+    "_ZTIN2nn5async13ResumeBlockerE",
+    "_ZTIN2nn5async16ResumeBlockerOneE",
+    "_ZTIN2nn5async6detail10IAwaitableE",
+    "_ZTIN2nn5async6detail11FutureStateIvEE",
+    "_ZTIN2nn5async6detail12IWaitHandlerE",
+    "_ZTIN2nn5async6detail15FutureStateBaseE",
+    "_ZTIN2nn5async6detail15GroupWaitHolderE",
+    "_ZTIN2nn5async6detail34ISynchronousContinuationListHolderE",
+    "_ZTINSt3__112bad_weak_ptrE",
+    "_ZTINSt3__117bad_function_callE",
+    "_ZTISt11logic_error",
+    "_ZTISt11range_error",
+    "_ZTISt12domain_error",
+    "_ZTISt12length_error",
+    "_ZTISt12out_of_range",
+    "_ZTISt13runtime_error",
+    "_ZTISt14overflow_error",
+    "_ZTISt15underflow_error",
+    "_ZTISt16invalid_argument",
+    "_ZTISt19bad_optional_access",
+    "_ZTISt20bad_array_new_length",
+    "_ZTISt9bad_alloc",
+    "_ZTISt9exception",
+    "_ZTSN2nn14MemoryResourceE",
+    "_ZTSN2nn4util17IntrusiveListNodeE",
+    "_ZTSN2nn4util21IntrusiveListBaseNodeINS_5async6detail15GroupWaitHolderES4_EE",
+    "_ZTSN2nn5async13ResumeBlockerE",
+    "_ZTSN2nn5async16ResumeBlockerOneE",
+    "_ZTSN2nn5async6detail10IAwaitableE",
+    "_ZTSN2nn5async6detail11FutureStateIvEE",
+    "_ZTSN2nn5async6detail12IWaitHandlerE",
+    "_ZTSN2nn5async6detail15FutureStateBaseE",
+    "_ZTSN2nn5async6detail15GroupWaitHolderE",
+    "_ZTSN2nn5async6detail34ISynchronousContinuationListHolderE",
+    "_ZTSNSt3__112bad_weak_ptrE"
+   ],
+   "eh_frame_hdr_fde_count": 271718,
+   "bl_target_count": 57133,
+   "nvn_strings_count": 536
+  },
+  "sdk": {
+   "size": 6204231,
+   "flags": "0x3f",
+   "build_id": "574284B40C06CF1821A44857939083BEE5716820",
+   "build_id_matches_bootlog": true,
+   "segments": [
+    {
+     "name": "text",
+     "mem": "0x0",
+     "size": "0x663700",
+     "csize": "0x3c1665",
+     "compressed": true
+    },
+    {
+     "name": "ro",
+     "mem": "0x664000",
+     "size": "0x4cbe70",
+     "csize": "0x215902",
+     "compressed": true
+    },
+    {
+     "name": "data",
+     "mem": "0xb30000",
+     "size": "0x554e8",
+     "csize": "0x13ada",
+     "compressed": true
+    }
+   ],
+   "bss_size": "0xcfb18",
+   "mod0": {
+    "mod0_vaddr": "0x66401c",
+    "dynamic_rel": "0x50533c",
+    "bss_start_rel": "0x521fe4",
+    "bss_end_rel": "0x5f050c",
+    "eh_frame_hdr_start_rel": "0x3adff8",
+    "eh_frame_hdr_end_rel": "0x3edd0c"
+   },
+   "dynamic": [
+    {
+     "tag": "0xe",
+     "val": "0x170ccd"
+    },
+    {
+     "tag": "DT_FLAGS",
+     "val": "0x8"
+    },
+    {
+     "tag": "0x6ffffffb",
+     "val": "0x1"
+    },
+    {
+     "tag": "DT_RELA",
+     "val": "0x664060"
+    },
+    {
+     "tag": "DT_RELASZ",
+     "val": "0x41b50"
+    },
+    {
+     "tag": "DT_RELAENT",
+     "val": "0x18"
+    },
+    {
+     "tag": "0x24",
+     "val": "0x6d39f0"
+    },
+    {
+     "tag": "0x23",
+     "val": "0xfa0"
+    },
+    {
+     "tag": "0x25",
+     "val": "0x8"
+    },
+    {
+     "tag": "DT_JMPREL",
+     "val": "0x6a5bb0"
+    },
+    {
+     "tag": "0x2",
+     "val": "0x2de40"
+    },
+    {
+     "tag": "0x3",
+     "val": "0xb6cfe8"
+    },
+    {
+     "tag": "DT_PLTRELSZ",
+     "val": "0x7"
+    },
+    {
+     "tag": "DT_SYMTAB",
+     "val": "0x700bf8"
+    },
+    {
+     "tag": "DT_SYMENT",
+     "val": "0x18"
+    },
+    {
+     "tag": "DT_STRTAB",
+     "val": "0x787e68"
+    },
+    {
+     "tag": "DT_STRSZ",
+     "val": "0x170cd7"
+    },
+    {
+     "tag": "DT_GNU_HASH",
+     "val": "0x6d4990"
+    },
+    {
+     "tag": "DT_INIT_ARRAY",
+     "val": "0xb30000"
+    },
+    {
+     "tag": "DT_INIT_ARRAYSZ",
+     "val": "0x298"
+    },
+    {
+     "tag": "DT_FINI_ARRAY",
+     "val": "0xb30298"
+    },
+    {
+     "tag": "DT_FINI_ARRAYSZ",
+     "val": "0x0"
+    },
+    {
+     "tag": "DT_INIT",
+     "val": "0x400"
+    },
+    {
+     "tag": "DT_FINI",
+     "val": "0x560"
+    }
+   ],
+   "dynsyms": {
+    "strtab": "0x787e68",
+    "symtab": "0x700bf8",
+    "strsz": "0x170cd7",
+    "count": 23066
+   },
+   "imports": 8,
+   "exports": 23057,
+   "nvn_imports": [],
+   "nvn_exports": [
+    "_Z22nvndetailUseMiddleWarev",
+    "nvnBootstrapLoader",
+    "nvnBootstrapLoaderInternal",
+    "nvnDevtoolsBootstrap",
+    "nvnInstallGlobalDebugCallback",
+    "nvnPrivate0"
+   ],
+   "sample_imports": [
+    "__nnDetailNintendoSdkRuntimeObjectFile",
+    "aligned_alloc",
+    "calloc",
+    "free",
+    "malloc",
+    "nnMain",
+    "nninitStartup",
+    "realloc"
+   ],
+   "sample_exports": [
+    "BAZOutlineSmooth",
+    "CACHE_ENTRY_calloc",
+    "CACHE_ENTRY_free",
+    "FSS_add_font",
+    "FSS_add_font_with_offset",
+    "FSS_calloc",
+    "FSS_delete_font",
+    "FSS_end_client",
+    "FSS_exit",
+    "FSS_font_metrics",
+    "FSS_font_name",
+    "FSS_font_name_with_offset",
+    "FSS_free",
+    "FSS_free_char",
+    "FSS_free_table",
+    "FSS_get_advance",
+    "FSS_get_ascender_descender_leading",
+    "FSS_get_available_fonts",
+    "FSS_get_bitmap",
+    "FSS_get_cmap",
+    "FSS_get_design_units",
+    "FSS_get_font_path",
+    "FSS_get_glyph_metrics",
+    "FSS_get_glyphmap",
+    "FSS_get_gpos_pts",
+    "FSS_get_graymap",
+    "FSS_get_kerning",
+    "FSS_get_link_info",
+    "FSS_get_name",
+    "FSS_get_outline",
+    "FSS_get_phased",
+    "FSS_get_ppem_size",
+    "FSS_get_scale",
+    "FSS_get_table",
+    "FSS_get_table_structure",
+    "FSS_get_vdmx_pair",
+    "FSS_init",
+    "FSS_inverse_map_char",
+    "FSS_load_font",
+    "FSS_load_font_with_offset"
+   ],
+   "eh_frame_hdr_fde_count": 32673,
+   "bl_target_count": 9903,
+   "nvn_strings_count": 38
+  }
+ },
+ "npdm": {
+  "size": 1636,
+  "program_id_at": "0x480",
+  "program_id": "0x100c2500fc20000",
+  "aci0": [
+   "0x470",
+   "0x1f4"
+  ],
+  "acid": [
+   "0x80",
+   "0x3e4"
+  ],
+  "aci0_magic": "ACI0",
+  "acid_magic": "A\u000b\u00f5\u0098",
+  "service_list": {
+   "field": "0x498",
+   "rel": "0x80",
+   "size": "0x144",
+   "count": 49
+  },
+  "services": [
+   "acc:u0",
+   "aoc:u",
+   "apm",
+   "appletOE",
+   "audin:u",
+   "audout:u",
+   "audren:u",
+   "banana",
+   "bcat:u",
+   "bsd:u",
+   "bsdcfg",
+   "caps:su",
+   "caps:u",
+   "csrng",
+   "ectx:aw",
+   "friend:u",
+   "fsp-srv",
+   "hid",
+   "htc",
+   "htc:tenv",
+   "htcs",
+   "hwopus",
+   "irs",
+   "ldn:u",
+   "ldr:ro",
+   "lm",
+   "mii:u",
+   "mm:u",
+   "mnpp:app",
+   "nfc:mf:u",
+   "nfc:user",
+   "nfp:user",
+   "ngc:u",
+   "ngct:u",
+   "nifm:u",
+   "nim:eca",
+   "notif:a",
+   "nsd:u",
+   "ntc",
+   "nvdrv",
+   "pcm",
+   "pctl",
+   "pl:u",
+   "prepo:u",
+   "set",
+   "sfdnsres",
+   "ssl",
+   "time:u",
+   "vi:u"
+  ]
+ }
+}
