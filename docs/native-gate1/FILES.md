@@ -55,5 +55,5 @@ source from build artifact — generated outputs are NOT in git.
 
 ## What is NOT in this folder
 No game files, no keys, no firmware, no titlekeys, no NSO bytes, no
-decrypted ExeFS, no Nintendo art, no "bypass" wording, no anticheat /
+decrypted ExeFS, no Nintendo art, no circumvention wording, no anticheat /
 online work, no binary release.

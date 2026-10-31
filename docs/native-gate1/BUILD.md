@@ -81,7 +81,7 @@ download. You must obtain your own files. See README.md for Gate status.
 ## What is NOT built here
 - No online play, no anticheat, no consensus / turn-hash work.
 - No game files, keys, firmware, titlekeys, NSO bytes, or decrypted ExeFS.
-- No "bypass" wording, no Nintendo art, no character screenshots.
+- No circumvention wording, no Nintendo art, no character screenshots.
 - No binary release. A release comes only after Gate 1 (nnMain +
   GetService), Gate 2 (title/plaza draw + CSV), and Gate 3 (saves / DLC /
   launcher integration, tested clean), in that order.
