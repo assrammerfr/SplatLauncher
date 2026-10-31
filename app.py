@@ -1,23 +1,106 @@
-"""PySide6 frontend: pick a library root, choose a title, edit its profile, launch."""
+"""PySide6 frontend: Splatoon-themed library, settings, saves, gallery, and help."""
 import shutil
 import sys
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QFileDialog, QFormLayout, QHBoxLayout, QLabel,
-    QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
-    QPushButton, QSpinBox, QTabWidget, QTextBrowser, QVBoxLayout, QWidget,
+    QApplication, QCheckBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout,
+    QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
+    QPushButton, QScrollArea, QSizePolicy, QSpinBox, QTabWidget, QTextBrowser,
+    QVBoxLayout, QWidget,
 )
 
 import core
 import theme
 
 
+class GameCard(QWidget):
+    def __init__(self, entry, on_launch, on_select):
+        super().__init__()
+        self.entry = entry
+        self.on_launch = on_launch
+        self.on_select = on_select
+        self.setObjectName("game-card")
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+
+        title_id = entry.get("title_id", "")
+        is_s2 = title_id == "01003BC0000A0000"
+        self.primary = theme.S2_PINK if is_s2 else theme.S3_YELLOW
+        self.secondary = theme.S2_TURQ if is_s2 else theme.S3_BLUE
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 16, 18, 16)
+        layout.setSpacing(10)
+
+        top = QHBoxLayout()
+        title = QLabel(entry.get("name", "Splatoon"))
+        title.setObjectName("game-name")
+        title.setStyleSheet(f"color: {self.primary};")
+        top.addWidget(title)
+        badge = QLabel(title_id)
+        badge.setObjectName("game-badge")
+        badge.setStyleSheet(f"background: {self.secondary}; color: #06141f; border-radius: 10px; padding: 4px 8px; font-weight: 700;")
+        top.addWidget(badge, 0, Qt.AlignRight)
+        layout.addLayout(top)
+
+        tags = []
+        if entry.get("version"):
+            tags.append(entry["version"])
+        for tag in entry.get("dlc_tags", []):
+            tags.append(tag)
+        if not tags:
+            tags.append("Base install")
+        tag_row = QHBoxLayout()
+        for tag in tags:
+            chip = QLabel(tag)
+            chip.setObjectName("game-tag")
+            chip.setStyleSheet(f"background: rgba(255,255,255,.06); border: 1px solid {self.secondary}; color: {theme.TEXT}; border-radius: 12px; padding: 4px 8px; font-size: 9pt;")
+            tag_row.addWidget(chip)
+        tag_row.addStretch()
+        layout.addLayout(tag_row)
+
+        status_line = QLabel(
+            "Base: found  •  Update: {update}  •  Save: {save}".format(
+                update="found" if self._has_parent_dir(entry, "update") else "missing",
+                save="ready" if entry.get("save_dir") else "not set",
+            )
+        )
+        status_line.setObjectName("game-status")
+        layout.addWidget(status_line)
+
+        actions = QHBoxLayout()
+        launch_btn = QPushButton("Launch")
+        launch_btn.setObjectName("launch-card")
+        launch_btn.setStyleSheet(f"background: {self.primary}; color: #071827; font-weight: 700; border: none; border-radius: 8px; padding: 8px 12px;")
+        launch_btn.clicked.connect(lambda: self.on_launch(entry))
+        actions.addWidget(launch_btn)
+        details_btn = QPushButton("Open settings")
+        details_btn.clicked.connect(lambda: self.on_select(entry))
+        details_btn.setObjectName("secondary-card")
+        actions.addWidget(details_btn)
+        actions.addStretch()
+        layout.addLayout(actions)
+
+        self.setStyleSheet(f"QWidget#game-card {{ background: rgba(255,255,255,0.03); border: 1px solid {self.secondary}; border-radius: 14px; }} QLabel#game-name {{ font-size: 22px; font-weight: 800; }} QLabel#game-badge {{ font-size: 9pt; font-weight: 700; }} QLabel#game-status {{ color: {theme.MUTED}; font-size: 9pt; }}")
+
+    @staticmethod
+    def _has_parent_dir(entry, name):
+        path = Path(entry.get("path", ""))
+        if not path.exists():
+            return False
+        for child in path.parent.iterdir():
+            lowered = child.name.lower()
+            if name in lowered:
+                return True
+        return False
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("SplatLaunch")
-        self.resize(920, 620)
+        self.resize(1100, 700)
         self.profiles = core.load_profiles()
         self.config = core.load_config()
         self.library = []
@@ -26,6 +109,7 @@ class MainWindow(QMainWindow):
         self.root_edit = QLineEdit(self.config.get("library_root", ""))
         self.list = QListWidget()
         self.list.currentItemChanged.connect(self.on_select)
+        self.list.hide()
         self.backup_list = QListWidget()
         self.gallery = QListWidget()
 
@@ -54,14 +138,84 @@ class MainWindow(QMainWindow):
             app.setStyleSheet(theme.STYLESHEET)
 
     def _library_tab(self):
-        browse = QPushButton("Choose library folder...")
+        browse = QPushButton("Choose Folder")
         browse.clicked.connect(self.pick_root)
+        browse.setObjectName("library-action")
         scan = QPushButton("Scan")
         scan.clicked.connect(self.scan)
+        scan.setObjectName("library-action")
 
-        row = QHBoxLayout(); row.addWidget(self.root_edit); row.addWidget(browse); row.addWidget(scan)
-        wrapper = QWidget(); wrapper_layout = QVBoxLayout(); wrapper_layout.addLayout(row); wrapper_layout.addWidget(self.list); wrapper.setLayout(wrapper_layout)
-        return wrapper
+        root_row = QHBoxLayout()
+        root_row.addWidget(self.root_edit)
+        root_row.addWidget(browse)
+        root_row.addWidget(scan)
+
+        self.library_scroll = QScrollArea()
+        self.library_scroll.setWidgetResizable(True)
+        self.library_container = QWidget()
+        self.library_layout = QVBoxLayout(self.library_container)
+        self.library_layout.setContentsMargins(0, 0, 0, 0)
+        self.library_layout.setSpacing(14)
+        self.library_scroll.setWidget(self.library_container)
+
+        self.empty_state = self._build_empty_state()
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(12)
+        layout.addWidget(self._brand_header())
+        layout.addLayout(root_row)
+        layout.addWidget(self.empty_state)
+        layout.addWidget(self.library_scroll)
+        self.library_scroll.hide()
+        return container
+
+    def _brand_header(self):
+        header = QWidget()
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        badge = QLabel("◉")
+        badge.setObjectName("brand-mark")
+        badge.setAlignment(Qt.AlignCenter)
+        badge.setStyleSheet(f"background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5, stop:0 {theme.S2_PINK}, stop:0.55 {theme.S2_TURQ}, stop:1 rgba(0,0,0,0)); color: white; border-radius: 24px; min-width: 48px; min-height: 48px; font-size: 22px; font-weight: 700;")
+        title = QLabel("SplatLaunch")
+        title.setObjectName("brand-title")
+        header_layout.addWidget(badge)
+        header_layout.addWidget(title)
+        header_layout.addStretch()
+        return header
+
+    def _build_empty_state(self):
+        widget = QWidget()
+        widget.setObjectName("empty-state")
+        layout = QVBoxLayout(widget)
+        layout.setAlignment(Qt.AlignCenter)
+        layout.setContentsMargins(30, 40, 30, 30)
+
+        icon = QLabel("◌")
+        icon.setObjectName("empty-icon")
+        icon.setAlignment(Qt.AlignCenter)
+        icon.setStyleSheet(f"background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5, stop:0 {theme.S2_PINK}, stop:0.5 {theme.S2_TURQ}, stop:1 rgba(0,0,0,0)); color: rgba(255,255,255,0.85); border-radius: 80px; min-width: 150px; min-height: 150px; font-size: 72px;")
+
+        text = QLabel("No games found yet — Choose a folder, then Scan")
+        text.setObjectName("empty-title")
+        text.setAlignment(Qt.AlignCenter)
+        text.setWordWrap(True)
+
+        actions = QHBoxLayout()
+        choose_btn = QPushButton("Choose Folder")
+        choose_btn.clicked.connect(self.pick_root)
+        choose_btn.setObjectName("library-action")
+        scan_btn = QPushButton("Scan")
+        scan_btn.clicked.connect(self.scan)
+        scan_btn.setObjectName("library-action")
+        actions.addStretch(); actions.addWidget(choose_btn); actions.addWidget(scan_btn); actions.addStretch()
+
+        layout.addWidget(icon)
+        layout.addWidget(text)
+        layout.addLayout(actions)
+        return widget
 
     def _settings_tab(self):
         form = QFormLayout()
@@ -143,20 +297,33 @@ class MainWindow(QMainWindow):
     def scan(self):
         self.list.clear()
         self.library = core.scan_library(Path(self.root_edit.text()))
+        self._render_cards()
+        if not self.library:
+            QMessageBox.information(self, "Nothing found", "No Splatoon 2 or 3 folders found under that path.")
+        if self.list.count() > 0:
+            self.list.setCurrentRow(0)
+
+    def _render_cards(self):
+        while self.library_layout.count():
+            item = self.library_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+        if not self.library:
+            self.library_scroll.hide()
+            self.empty_state.show()
+            return
+        self.empty_state.hide()
+        self.library_scroll.show()
         for entry in self.library:
             item = QListWidgetItem(f"{entry['name']}  ({entry['title_id']})")
             item.setData(256, entry)
             self.list.addItem(item)
-        if not self.library:
-            QMessageBox.information(self, "Nothing found",
-                "No Splatoon 2 or 3 folders found under that path.")
-        if self.list.count() > 0:
-            self.list.setCurrentRow(0)
+            card = GameCard(entry, self.launch_entry, self.select_entry)
+            self.library_layout.addWidget(card)
+        self.library_layout.addStretch()
 
-    def on_select(self, item, _prev):
-        if item is None:
-            return
-        entry = item.data(256)
+    def select_entry(self, entry):
         self.current_tid = entry["title_id"]
         p = self.profiles.get(self.current_tid)
         if p is None:
@@ -167,6 +334,15 @@ class MainWindow(QMainWindow):
         self.height.setValue(p.height)
         self.fullscreen.setChecked(p.fullscreen)
         self.vsync.setChecked(p.vsync)
+
+    def launch_entry(self, entry):
+        self.select_entry(entry)
+        self.launch()
+
+    def on_select(self, item, _prev):
+        if item is None:
+            return
+        self.select_entry(item.data(256))
 
     def _current_profile(self) -> core.Profile:
         profile = core.Profile(

@@ -11,6 +11,10 @@ KNOWN_TITLES = {
     "01003BC0000A0000": "Splatoon 2",
     "0100C2500FC20000": "Splatoon 3",
 }
+KNOWN_VERSIONS = {
+    "01003BC0000A0000": "v5.5.1",
+    "0100C2500FC20000": "v11.2.0",
+}
 
 PROFILE_FILE = Path.home() / ".splatlaunch" / "profiles.json"
 CONFIG_FILE = Path.home() / ".splatlaunch" / "config.json"
@@ -69,6 +73,21 @@ def _manifest_entry(path: Path) -> dict | None:
     return None
 
 
+def _folder_tags(root: Path, title_id: str) -> list[str]:
+    tags: list[str] = []
+    if not root.exists() or not root.is_dir():
+        return tags
+    lowered = [p.name.lower() for p in root.iterdir() if p.is_dir()]
+    if title_id == "01003BC0000A0000" and any("octo" in item or "expansion" in item for item in lowered):
+        tags.append("Octo Expansion")
+    if title_id == "0100C2500FC20000":
+        if any("inkopolis" in item for item in lowered):
+            tags.append("Inkopolis")
+        if any("side order" in item or "order sector" in item for item in lowered):
+            tags.append("Side Order")
+    return tags
+
+
 def scan_library(root: Path) -> list[dict]:
     """Find title folders under root by manifest or known title ID.
     Each folder must hold your own extracted dump; nothing is downloaded."""
@@ -79,6 +98,9 @@ def scan_library(root: Path) -> list[dict]:
     for candidate in sorted(root.rglob("*.json"), key=lambda p: str(p).lower()):
         entry = _manifest_entry(candidate.parent)
         if entry and entry["title_id"] not in seen:
+            entry["version"] = KNOWN_VERSIONS.get(entry["title_id"], "")
+            entry["dlc_tags"] = _folder_tags(Path(entry["path"]), entry["title_id"])
+            entry["save_dir"] = ""
             found.append(entry)
             seen.add(entry["title_id"])
 
@@ -96,7 +118,14 @@ def scan_library(root: Path) -> list[dict]:
         display_path = str(path if path.is_dir() else path.parent)
         if any(Path(item["path"]) == Path(display_path) for item in found):
             continue
-        found.append({"title_id": tid, "name": name, "path": display_path})
+        found.append({
+            "title_id": tid,
+            "name": name,
+            "path": display_path,
+            "version": KNOWN_VERSIONS.get(tid, ""),
+            "dlc_tags": _folder_tags(Path(display_path), tid),
+            "save_dir": "",
+        })
         seen.add(tid)
     return found
 
