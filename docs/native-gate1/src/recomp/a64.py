@@ -364,43 +364,11 @@ class FnEmitter:
             return self._bitfield(pc, m, ops)
 
         # ---- conditional select / compare ----
-        if m in ("csel", "csinc", "csinv", "csneg"):
-            rd, rn, rm, cond = ops[0][1], ops[1][1], ops[2][1], ops[3][1]
-            w = self.is_w(rd)
-            a = self.rd(rn, w)
-            b = self.rd(rm, w)
-            if m == "csinc":
-                b = f"({b} + 1)" if not w else f"(uint32_t)({b} + 1)"
-            elif m == "csinv":
-                b = f"(~{b})" if not w else f"(uint32_t)(~{b})"
-            elif m == "csneg":
-                b = f"(-({b}))" if not w else f"(uint32_t)(-({b}))"
-            c = CONDC[cond]
-            expr = f"(a64_cond(c, {c}) ? ({b}) : ({a}))"
-            self.put(self.wr(rd, expr, w))
-            return
+        if m in ("csel", "csinc", "csinv", "csneg", "cset", "cinc", "cinv",
+                 "cneg", "csetm"):
+            return self._csel(pc, m, ops, i)
         if m in ("ccmp", "ccmn"):
-            rn, op2 = ops[0][1], ops[1][1]
-            # capstone: ccmp x0, #0, eq  OR ccmp x0, x1, #0, eq  (ops vary)
-            if len(ops) == 4:
-                rhs, nzcv, cond = ops[1][1], ops[2][1], ops[3][1]
-                rhs_is_reg = ops[1][0] == "reg"
-            else:
-                rhs, nzcv, cond = ops[1][1], ops[2][1], ops[3][1]
-                rhs_is_reg = ops[1][0] == "reg"
-            w = self.is_w(rn)
-            a = self.rd(rn, w)
-            b = self.rd(rhs, w) if rhs_is_reg else (f"{rhs:#x}ull" if not w else f"{rhs:#x}u")
-            cc = CONDC[cond]
-            self.em(f"if (a64_cond(c, {cc})) {{")
-            if m == "ccmp":
-                self._flags_add(a, b, w)
-            else:
-                self._flags_sublike(a, b, w)
-            self.em("    } else {")
-            self.em(f"        c->n = {(nzcv >> 3) & 1}; c->z = {(nzcv >> 2) & 1}; c->c = {(nzcv >> 1) & 1}; c->v = {nzcv & 1};")
-            self.em("    }")
-            return
+            return self._ccmp(pc, m, ops, i)
 
         # ---- loads / stores ----
         if m in ("ldr", "ldrb", "ldrh", "ldrsb", "ldrsh", "ldrsw", "ldur", "ldurb",
@@ -449,6 +417,28 @@ class FnEmitter:
                  "usubw", "ssubw", "sadalp"):
             return self._simd(pc, m, ops, i)
 
+        if m in ("adc", "adcs", "sbc", "sbcs"):
+            return self._adc(pc, m, ops)
+        if m in ("clz", "cls", "rbit", "rev", "rev16", "rev32", "rev64"):
+            rd, rn = ops[0][1], ops[1][1]
+            w = self.is_w(rd)
+            bits = 32 if w else 64
+            if m == "clz":
+                expr = f"a64_clz{bits}({self.rd(rn, w)})"
+            elif m == "cls":
+                expr = f"a64_cls{bits}({self.rd(rn, w)})"
+            elif m == "rbit":
+                expr = f"a64_rbit{bits}({self.rd(rn, w)})"
+            elif m == "rev":
+                expr = f"a64_bswap{bits}({self.rd(rn, w)})"
+            elif m == "rev16":
+                expr = f"a64_rev16_{bits}({self.rd(rn, w)})"
+            elif m == "rev32":
+                expr = f"a64_bswap32({self.rd(rn, w)})" if w else f"a64_rev32_64({self.rd(rn, w)})"
+            else:
+                expr = f"a64_bswap64({self.rd(rn, w)})"
+            self.put(self.wr(rd, expr, w))
+            return
         if m in ("crc32b", "crc32h", "crc32w", "crc32x", "crc32cb", "crc32ch",
                  "crc32cw", "crc32cx"):
             rd, rn, rm = ops[0][1], ops[1][1], ops[2][1]
@@ -470,7 +460,7 @@ class FnEmitter:
         else:
             self.em(f"{{ uint64_t __a = (uint64_t)({a}); uint64_t __b = (uint64_t)({b}); uint64_t __r = __a + __b;")
             self.em("    c->n = (__r >> 63) & 1; c->z = (__r == 0);")
-            self.em("    c->c = ((unsigned __int128)__a + __b) >> 64; c->v = ((__a ^ __r) & (__b ^ __r)) >> 63; }")
+            self.em("    c->c = (__a + __b < __a); c->v = ((__a ^ __r) & (__b ^ __r)) >> 63; }")
 
     def _flags_sublike(self, a, b, w):
         # CMP: a - b flags
@@ -542,6 +532,97 @@ class FnEmitter:
                 self.put(self.wr(rd, expr, False))
             return
 
+    # =============== adc / sbc ===============
+    def _adc(self, pc, m, ops):
+        rd = ops[0][1]
+        rn = ops[1][1]
+        rm = ops[2][1]
+        w = self.is_w(rd)
+        bits = 32 if w else 64
+        a = self.rd(rn, w)
+        b = self.rd(rm, w)
+        carry = m in ("adc", "adcs")
+        if not carry:
+            b = f"(~{b})" if not w else f"(uint32_t)(~{b})"
+        if m in ("adcs", "sbcs"):
+            u = "uint32_t" if w else "uint64_t"
+            sh = 31 if w else 63
+            self.em(f"{{ {u} __a = ({a}); {u} __b = ({b}); "
+                    f"{u} __t = ({u})(__a + __b); {u} __r = ({u})(__t + c->c);")
+            self.em(f"    c->n = (__r >> {sh}) & 1; c->z = (__r == 0);")
+            self.em("    c->c = (__t < __a) || (__r < __t); "
+                    f"c->v = ((~(__a ^ __b) & (__a ^ __r)) >> {sh}) & 1;")
+            for s in self.wr(rd, "__r", w):
+                self.em("    " + s)
+            self.em("}")
+        else:
+            self.put(self.wr(rd, f"({a} + ({b}) + c->c)", w))
+
+    # =============== conditional select ===============
+    def cond_tok(self, i):
+        """Condition token from op_str's last field (robust across capstone forms)."""
+        parts = [p.strip() for p in i.op_str.split(",")]
+        tok = parts[-1].lower()
+        if tok not in CONDC:
+            raise Unsupported(i.address, 0, f"bad cond '{tok}'", i.mnemonic)
+        return CONDC[tok]
+
+    def _csel(self, pc, m, ops, i):
+        rd = ops[0][1]
+        w = self.is_w(rd)
+        cc = self.cond_tok(i)
+        zero = "0u" if w else "0ull"
+        if m in ("cset", "csetm"):
+            # cset rd, cond  == csinc rd, zr, zr, inv(cond)
+            cc ^= 1
+            if m == "cset":
+                expr = f"(a64_cond(c, {cc}) ? ({zero} + 1) : {zero})"
+            else:
+                expr = f"(a64_cond(c, {cc}) ? ~(uint{32 if w else 64}_t)0 : {zero})"
+            self.put(self.wr(rd, expr, w))
+            return
+        alias = m in ("cinc", "cinv", "cneg")
+        rn = ops[1][1]
+        a = self.rd(rn, w)
+        if alias:
+            b = zero
+        else:
+            rm = ops[2][1]
+            b = self.rd(rm, w) if isinstance(rm, str) else zero
+        # ARM: CSEL cond ? Rn : Rm; CSINC cond ? Rn+1 : Rm; CSINV cond ? ~Rn : Rm;
+        #       CSNEG cond ? -Rn : Rm
+        if m in ("csinc", "cinc"):
+            a = f"({a} + 1)" if not w else f"(uint32_t)({a} + 1)"
+        elif m in ("csinv", "cinv"):
+            a = f"(~{a})" if not w else f"(uint32_t)(~{a})"
+        elif m in ("csneg", "cneg"):
+            a = f"(-({a}))" if not w else f"(uint32_t)(-({a}))"
+        expr = f"(a64_cond(c, {cc}) ? ({a}) : ({b}))"
+        self.put(self.wr(rd, expr, w))
+
+    def _ccmp(self, pc, m, ops, i):
+        parts = [p.strip() for p in i.op_str.split(",")]
+        cc = self.cond_tok(i)
+        nzcv_tok = parts[-2].lstrip("#")
+        nzcv = int(nzcv_tok, 0)
+        rn = ops[0][1]
+        w = self.is_w(rn)
+        a = self.rd(rn, w)
+        rhs = ops[1] if len(ops) > 1 else ("imm", 0)
+        if rhs[0] == "reg":
+            b = self.rd(rhs[1], w)
+        else:
+            b = f"({rhs[1]:#x}ull)" if not w else f"({rhs[1] & 0xFFFFFFFF:#x}u)"
+        self.em(f"if (a64_cond(c, {cc})) {{")
+        if m == "ccmp":
+            self._flags_add(a, b, w)
+        else:
+            self._flags_sublike(a, b, w)
+        self.em("    } else {")
+        self.em(f"        c->n = {(nzcv >> 3) & 1}; c->z = {(nzcv >> 2) & 1}; "
+                f"c->c = {(nzcv >> 1) & 1}; c->v = {nzcv & 1};")
+        self.em("    }")
+
     # =============== add/sub ===============
     def _addsub(self, pc, m, ops):
         # forms: rd, rn, #imm / rd, rn, rm{, shift #n} / rd, rn, rm, extend #n / cmp aliases
@@ -558,21 +639,15 @@ class FnEmitter:
         else:
             rd = ops[0][1]
             rn = ops[1][1]
-        w = self.is_w(rd) or (m in ("cmp", "cmn") and self.is_w(ops[0][1]))
-        if m in ("cmp", "cmn"):
-            w = self.is_w(ops[0][1])
-            rn = ops[0][1]
-            rd = "xzr"
-        elif neg:
-            w = self.is_w(rd)
-            rn = "xzr"
-        if len(ops) >= 3:
-            rhs = ops[2]
+        if m in ("cmp", "cmn") or len(ops) < 3:
+            rhs = ops[1]
         else:
-            rhs = ops[1]
-        # operand count varies for cmp: ops[0]=rn, ops[1]=operand
-        if m in ("cmp", "cmn"):
-            rhs = ops[1]
+            rhs = ops[2]
+        # width from any w-prefixed operand (wzr alone is ambiguous)
+        w_toks = [rn, rd]
+        if rhs[0] == "reg":
+            w_toks.append(rhs[1])
+        w = any(isinstance(t, str) and t.lower().startswith("w") for t in w_toks)
         a = self.rd(rn, w)
         shift_amt = 0
         shift_type = None
@@ -659,9 +734,10 @@ class FnEmitter:
             setflags = m in ("ands", "bics")
             op = {"and": "&", "ands": "&", "bic": "&~", "bics": "&~",
                   "orr": "|", "orn": "|~", "eor": "^", "eon": "^~"}[m]
-        w = self.is_w(rd) or (m in ("tst", "teq") and self.is_w(rn))
-        if m in ("tst", "teq"):
-            w = self.is_w(rn)
+        toks = [rn, rd]
+        if rhs[0] == "reg":
+            toks.append(rhs[1])
+        w = any(t.lower().startswith("w") for t in toks if isinstance(t, str))
         a = self.rd(rn, w)
         if rhs[0] == "imm":
             v = rhs[1] & ((1 << 64) - 1)
@@ -1183,18 +1259,18 @@ class FnEmitter:
             if src[0] == "reg":
                 if rd[0] in ("x", "w") and src[1][0] in ("d", "s"):   # gpr -> fpr
                     if src[1][0] == "s":
-                        self.em(f"c->d[{rd[1:]}] = (uint64_t)(uint32_t)c->x[{self.ridx(src[1][1:])}];" if rd[0] == "w" else f"c->d[{rd[1:]}] = c->x[{self.ridx(src[1][1:])}];")
+                        self.em(f"c->d[{rd[1:]}] = (uint64_t)(uint32_t)c->x[{self.ridx(src[1])}];" if rd[0] == "w" else f"c->d[{rd[1:]}] = c->x[{self.ridx(src[1])}];")
                     else:
                         if rd[0] == "w":
-                            store32(rd, f"u32f((uint32_t)c->x[{self.ridx(src[1][1:])}])")
+                            store32(rd, f"u32f((uint32_t)c->x[{self.ridx(src[1])}])")
                         else:
-                            store64(rd, f"u64f(c->x[{self.ridx(src[1][1:])}])")
+                            store64(rd, f"u64f(c->x[{self.ridx(src[1])}])")
                     return
                 if rd[0] in ("d", "s") and src[1][0] in ("x", "w"):   # fpr -> gpr
                     if src[1][0] == "w" or rd[0] == "s":
-                        self.put(self.wr(rd, f"(uint32_t)c->d[{self.ridx(src[1][1:])}]", True))
+                        self.put(self.wr(rd, f"(uint32_t)c->d[{self.ridx(src[1])}]", True))
                     else:
-                        self.put(self.wr(rd, f"c->d[{self.ridx(src[1][1:])}]"))
+                        self.put(self.wr(rd, f"c->d[{self.ridx(src[1])}]"))
                     return
                 # fpr -> fpr
                 if rd[0] == "s" and src[1][0] == "s":

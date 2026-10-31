@@ -16,3 +16,9 @@ No game files, no keys, no firmware in this folder. No launcher code changed.
 - Generator updated: a64.py 59,444 B, gen.py 10,693 B, gen_report.json from the generator run.
 - NOT uploaded: build/gen/*.c generated outputs (~57 MB total, build artifacts, not source), vendor/lz4.c + lz4.h (third-party LZ4, dependency only), pycache.
 - Gate 1 is still NOT passed — skeleton started, first runnable unit to nnMain not yet reported.
+
+## Update 2026-10-30 23:31 CST — emitter fix
+- Recompiler updated: a64.py 62,404 B, a64_ctx.h 11,844 B.
+- New build tools: tools/build.py, tools/fixup_gen.py, tools/build.bat.
+- Generator re-ran at 23:31, sdk_gen_*.c outputs grew (e.g. sdk_gen_000.c to ~19 MB) — generated outputs NOT uploaded, source only.
+- Gate 1 still NOT passed — first runnable unit to nnMain not yet reported.

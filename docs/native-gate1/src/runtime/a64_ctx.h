@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include <math.h>
+#include <intrin.h>
 
 /* Stop pc: set by ExitProcess/Break, unmapped pc, or undef stops. */
 #define A64_STOP      0xdead0000dead0000ull
@@ -168,6 +169,51 @@ static inline void st32(A64Ctx* c, uint64_t a, uint64_t v) {
 }
 static inline void st64(A64Ctx* c, uint64_t a, uint64_t v) {
     (void)c; *(uint64_t*)(uintptr_t)a = v;
+}
+
+/* ---- bit ops ---- */
+static inline uint32_t a64_clz32(uint32_t v) {
+    unsigned long i;
+    if (!_BitScanReverse(&i, (unsigned long)v)) return 32;
+    return 31u - (uint32_t)i;
+}
+static inline uint64_t a64_clz64(uint64_t v) {
+    unsigned long i;
+    if (!_BitScanReverse64(&i, v)) return 64;
+    return 63ull - (uint64_t)i;
+}
+static inline uint32_t a64_cls32(uint32_t v) {
+    uint32_t msb = v >> 31, cnt = 0;
+    for (int i = 30; i >= 0; i--) { if (((v >> i) & 1) == msb) cnt++; else break; }
+    return cnt;
+}
+static inline uint64_t a64_cls64(uint64_t v) {
+    uint64_t msb = v >> 63, cnt = 0;
+    for (int i = 62; i >= 0; i--) { if (((v >> i) & 1) == msb) cnt++; else break; }
+    return cnt;
+}
+static inline uint32_t a64_rbit32(uint32_t v) {
+    uint32_t r = 0;
+    for (int i = 0; i < 32; i++) { r = (r << 1) | (v & 1); v >>= 1; }
+    return r;
+}
+static inline uint64_t a64_rbit64(uint64_t v) {
+    uint64_t r = 0;
+    for (int i = 0; i < 64; i++) { r = (r << 1) | (v & 1); v >>= 1; }
+    return r;
+}
+static inline uint32_t a64_bswap32(uint32_t v) { return _byteswap_ulong(v); }
+static inline uint64_t a64_bswap64(uint64_t v) { return _byteswap_uint64(v); }
+static inline uint32_t a64_rev16_32(uint32_t v) {
+    return ((v & 0x00ff00ffu) << 8) | ((v >> 8) & 0x00ff00ffu);
+}
+static inline uint64_t a64_rev16_64(uint64_t v) {
+    const uint64_t m = 0x00ff00ff00ff00ffull;
+    return ((v & m) << 8) | ((v >> 8) & m);
+}
+static inline uint64_t a64_rev32_64(uint64_t v) {
+    return ((uint64_t)_byteswap_ulong((uint32_t)(v >> 32)) << 32) |
+           (uint64_t)_byteswap_ulong((uint32_t)v);
 }
 
 /* ---- float bit conversions ---- */
