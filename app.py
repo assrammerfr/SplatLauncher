@@ -1,14 +1,31 @@
-"""PySide6 frontend: Splatoon-themed library, settings, saves, gallery, and help."""
+﻿from pathlib import Path
 import shutil
 import sys
-from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout,
-    QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
-    QPushButton, QScrollArea, QSizePolicy, QSpinBox, QTabWidget, QTextBrowser,
-    QVBoxLayout, QWidget,
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QSpinBox,
+    QTabWidget,
+    QTextBrowser,
+    QVBoxLayout,
+    QWidget,
 )
 
 import core
@@ -44,15 +61,15 @@ class GameCard(QWidget):
         top.addWidget(badge, 0, Qt.AlignRight)
         layout.addLayout(top)
 
-        tags = []
+        tag_items = []
         if entry.get("version"):
-            tags.append(entry["version"])
+            tag_items.append(entry["version"])
         for tag in entry.get("dlc_tags", []):
-            tags.append(tag)
-        if not tags:
-            tags.append("Base install")
+            tag_items.append(tag)
+        if not tag_items:
+            tag_items.append("Base install")
         tag_row = QHBoxLayout()
-        for tag in tags:
+        for tag in tag_items:
             chip = QLabel(tag)
             chip.setObjectName("game-tag")
             chip.setStyleSheet(f"background: rgba(255,255,255,.06); border: 1px solid {self.secondary}; color: {theme.TEXT}; border-radius: 12px; padding: 4px 8px; font-size: 9pt;")
@@ -60,12 +77,18 @@ class GameCard(QWidget):
         tag_row.addStretch()
         layout.addLayout(tag_row)
 
-        status_line = QLabel(
-            "Base: found  •  Update: {update}  •  Save: {save}".format(
-                update="found" if self._has_parent_dir(entry, "update") else "missing",
-                save="ready" if entry.get("save_dir") else "not set",
-            )
-        )
+        status_bits = []
+        dlc_status = entry.get("dlc_status", {})
+        if title_id == "01003BC0000A0000":
+            status_bits.append(f"Base: {'found' if dlc_status.get('base', False) else 'missing'}")
+            status_bits.append(f"Update: {'found' if dlc_status.get('update', False) else 'missing'}")
+            status_bits.append(f"Octo: {'found' if dlc_status.get('octo_expansion', False) else 'missing'}")
+        elif title_id == "0100C2500FC20000":
+            status_bits.append(f"Base: {'found' if dlc_status.get('base', False) else 'missing'}")
+            status_bits.append(f"Update: {'found' if dlc_status.get('update', False) else 'missing'}")
+            status_bits.append(f"Inkopolis: {'found' if dlc_status.get('inkopolis', False) else 'missing'}")
+            status_bits.append(f"Side Order: {'found' if dlc_status.get('side_order', False) else 'missing'}")
+        status_line = QLabel(" • ".join(status_bits))
         status_line.setObjectName("game-status")
         layout.addWidget(status_line)
 
@@ -84,27 +107,20 @@ class GameCard(QWidget):
 
         self.setStyleSheet(f"QWidget#game-card {{ background: rgba(255,255,255,0.03); border: 1px solid {self.secondary}; border-radius: 14px; }} QLabel#game-name {{ font-size: 22px; font-weight: 800; }} QLabel#game-badge {{ font-size: 9pt; font-weight: 700; }} QLabel#game-status {{ color: {theme.MUTED}; font-size: 9pt; }}")
 
-    @staticmethod
-    def _has_parent_dir(entry, name):
-        path = Path(entry.get("path", ""))
-        if not path.exists():
-            return False
-        for child in path.parent.iterdir():
-            lowered = child.name.lower()
-            if name in lowered:
-                return True
-        return False
-
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("SplatLaunch")
-        self.resize(1100, 700)
+        self.resize(1100, 720)
+        icon_path = Path(__file__).with_name("SplatLaunch-icon.png")
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
         self.profiles = core.load_profiles()
         self.config = core.load_config()
         self.library = []
         self.current_tid = None
+        self.scan_cache = {}
 
         self.root_edit = QLineEdit(self.config.get("library_root", ""))
         self.list = QListWidget()
@@ -112,13 +128,19 @@ class MainWindow(QMainWindow):
         self.list.hide()
         self.backup_list = QListWidget()
         self.gallery = QListWidget()
+        self.mod_list = QListWidget()
 
         self.game_dir = QLineEdit()
         self.save_dir = QLineEdit()
-        self.width = QSpinBox(); self.width.setRange(640, 7680); self.width.setValue(int(self.config.get("width", 1920)))
-        self.height = QSpinBox(); self.height.setRange(480, 4320); self.height.setValue(int(self.config.get("height", 1080)))
+        self.width = QSpinBox(); self.width.setRange(640, 7680); self.width.setValue(int(self.config.get("width", 720)))
+        self.height = QSpinBox(); self.height.setRange(480, 4320); self.height.setValue(int(self.config.get("height", 1280)))
         self.fullscreen = QCheckBox("Fullscreen")
         self.vsync = QCheckBox("VSync"); self.vsync.setChecked(bool(self.config.get("vsync", True)))
+        self.performance_combo = QComboBox()
+        self.performance_combo.addItem("Balanced")
+        self.performance_combo.addItem("Performance")
+        current_option = "Performance" if self.config.get("runtime_options", {}).get("docked_mode") is False else "Balanced"
+        self.performance_combo.setCurrentText(current_option)
 
         self.runtime_edit = QLineEdit(self.config.get("runtime_exe", ""))
         self.runtime_edit.setPlaceholderText("Path to your runtime executable")
@@ -129,6 +151,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._library_tab(), "Library")
         self.tabs.addTab(self._settings_tab(), "Settings")
         self.tabs.addTab(self._saves_tab(), "Saves")
+        self.tabs.addTab(self._mods_tab(), "Mods")
         self.tabs.addTab(self._gallery_tab(), "Gallery")
         self.tabs.addTab(self._help_tab(), "Help")
         self.setCentralWidget(self.tabs)
@@ -142,7 +165,7 @@ class MainWindow(QMainWindow):
         browse.clicked.connect(self.pick_root)
         browse.setObjectName("library-action")
         scan = QPushButton("Scan")
-        scan.clicked.connect(self.scan)
+        scan.clicked.connect(lambda: self.scan(force=True))
         scan.setObjectName("library-action")
 
         root_row = QHBoxLayout()
@@ -196,35 +219,41 @@ class MainWindow(QMainWindow):
         icon = QLabel("◌")
         icon.setObjectName("empty-icon")
         icon.setAlignment(Qt.AlignCenter)
-        icon.setStyleSheet(f"background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5, stop:0 {theme.S2_PINK}, stop:0.5 {theme.S2_TURQ}, stop:1 rgba(0,0,0,0)); color: rgba(255,255,255,0.85); border-radius: 80px; min-width: 150px; min-height: 150px; font-size: 72px;")
-
-        text = QLabel("No games found yet — Choose a folder, then Scan")
-        text.setObjectName("empty-title")
-        text.setAlignment(Qt.AlignCenter)
-        text.setWordWrap(True)
-
-        actions = QHBoxLayout()
-        choose_btn = QPushButton("Choose Folder")
-        choose_btn.clicked.connect(self.pick_root)
-        choose_btn.setObjectName("library-action")
-        scan_btn = QPushButton("Scan")
-        scan_btn.clicked.connect(self.scan)
-        scan_btn.setObjectName("library-action")
-        actions.addStretch(); actions.addWidget(choose_btn); actions.addWidget(scan_btn); actions.addStretch()
+        icon.setStyleSheet(f"background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5, stop:0 {theme.S2_PINK}, stop:0.5 {theme.S2_TURQ}, stop:1 rgba(0,0,0,0)); color: white; border-radius: 28px; min-width: 56px; min-height: 56px; font-size: 22px; font-weight: 700;")
+        title = QLabel("No games found yet")
+        title.setObjectName("empty-title")
+        msg = QLabel("Choose a folder, then Scan to load your Splatoon 2 / 3 library.")
+        msg.setObjectName("empty-message")
+        buttons = QHBoxLayout()
+        btn_choose = QPushButton("Choose Folder")
+        btn_choose.setObjectName("library-action")
+        btn_choose.clicked.connect(self.pick_root)
+        btn_scan = QPushButton("Scan")
+        btn_scan.setObjectName("library-action")
+        btn_scan.clicked.connect(lambda: self.scan(force=True))
+        buttons.addWidget(btn_choose)
+        buttons.addWidget(btn_scan)
 
         layout.addWidget(icon)
-        layout.addWidget(text)
-        layout.addLayout(actions)
+        layout.addWidget(title)
+        layout.addWidget(msg)
+        layout.addLayout(buttons)
         return widget
 
     def _settings_tab(self):
         form = QFormLayout()
         form.addRow("Game folder", self.game_dir)
         form.addRow("Save folder", self.save_dir)
-        form.addRow("Width", self.width)
+        form.addRow("Resolution", self.width)
         form.addRow("Height", self.height)
         form.addRow("", self.fullscreen)
         form.addRow("", self.vsync)
+        preset_row = QHBoxLayout()
+        preset_row.addWidget(self.performance_combo)
+        preset_btn = QPushButton("Apply preset")
+        preset_btn.clicked.connect(self.apply_performance_preset)
+        preset_row.addWidget(preset_btn)
+        form.addRow("Performance preset", preset_row)
         form.addRow("Runtime executable", self.runtime_edit)
 
         save_btn = QPushButton("Save profile")
@@ -260,6 +289,17 @@ class MainWindow(QMainWindow):
         self.refresh_backups()
         return container
 
+    def _mods_tab(self):
+        refresh = QPushButton("Refresh mods")
+        refresh.clicked.connect(self.refresh_mods)
+        toggle = QPushButton("Toggle selected")
+        toggle.clicked.connect(self.toggle_selected_mod)
+        row = QHBoxLayout(); row.addWidget(refresh); row.addWidget(toggle)
+        self.mod_list.itemDoubleClicked.connect(self.toggle_selected_mod)
+        container = QWidget(); layout = QVBoxLayout(); layout.addLayout(row); layout.addWidget(self.mod_list); container.setLayout(layout)
+        self.refresh_mods()
+        return container
+
     def _gallery_tab(self):
         self.gallery.itemDoubleClicked.connect(self.open_gallery_image)
         container = QWidget(); layout = QVBoxLayout(); layout.addWidget(QLabel("Photo gallery placeholder. Screenshots are read from save folders when present.")); layout.addWidget(self.gallery); container.setLayout(layout)
@@ -271,15 +311,14 @@ class MainWindow(QMainWindow):
         help_text.setOpenExternalLinks(True)
         help_text.setHtml(
             "<h2>SplatLaunch help</h2>"
-            "<p>1. Point the library folder at the root that contains your extracted Splatoon dump folders.</p>"
-            "<p>2. Scan the root, pick the title, then set the game and save folders.</p>"
-            "<p>3. Set a runtime executable such as a harmless test exe before launching the real runtime.</p>"
+            "<p>1. Set the root folder that contains your extracted dumps.</p>"
+            "<p>2. Scan the library and select the game you want to configure.</p>"
+            "<p>3. Use the Performance preset or custom runtime options for a smoother match.</p>"
             "<h3>Common problems</h3>"
             "<ul>"
-            "<li>PySide6 missing: run <b>pip install -r requirements.txt</b>.</li>"
             "<li>Title not found: check the folder name or add a manifest.json with <b>title_id</b>.</li>"
             "<li>Runtime exe not set: fill in the Runtime executable field before Launch.</li>"
-            "<li>Folder not found: make sure the library root contains the extracted dump path.</li>"
+            "<li>Missing DLC: the card will warn on the status line.</li>"
             "</ul>"
             "<p>Links: <a href='https://pyside.org/'>PySide6</a></p>"
         )
@@ -292,16 +331,22 @@ class MainWindow(QMainWindow):
             self.root_edit.setText(path)
             self.config["library_root"] = path
             core.save_config(self.config)
-            self.scan()
+            self.scan(force=True)
 
-    def scan(self):
-        self.list.clear()
-        self.library = core.scan_library(Path(self.root_edit.text()))
+    def scan(self, force: bool = False):
+        root_text = self.root_edit.text().strip()
+        if not root_text:
+            self.library = []
+            self._render_cards()
+            return
+        root = Path(root_text)
+        key = str(root)
+        if force or key not in self.scan_cache:
+            self.scan_cache[key] = core.scan_library(root)
+        self.library = self.scan_cache[key]
         self._render_cards()
         if not self.library:
             QMessageBox.information(self, "Nothing found", "No Splatoon 2 or 3 folders found under that path.")
-        if self.list.count() > 0:
-            self.list.setCurrentRow(0)
 
     def _render_cards(self):
         while self.library_layout.count():
@@ -316,9 +361,6 @@ class MainWindow(QMainWindow):
         self.empty_state.hide()
         self.library_scroll.show()
         for entry in self.library:
-            item = QListWidgetItem(f"{entry['name']}  ({entry['title_id']})")
-            item.setData(256, entry)
-            self.list.addItem(item)
             card = GameCard(entry, self.launch_entry, self.select_entry)
             self.library_layout.addWidget(card)
         self.library_layout.addStretch()
@@ -334,6 +376,7 @@ class MainWindow(QMainWindow):
         self.height.setValue(p.height)
         self.fullscreen.setChecked(p.fullscreen)
         self.vsync.setChecked(p.vsync)
+        self.refresh_mods()
 
     def launch_entry(self, entry):
         self.select_entry(entry)
@@ -346,7 +389,7 @@ class MainWindow(QMainWindow):
 
     def _current_profile(self) -> core.Profile:
         profile = core.Profile(
-            title_id=self.current_tid,
+            title_id=self.current_tid or "",
             game_dir=self.game_dir.text(),
             save_dir=self.save_dir.text(),
             width=self.width.value(),
@@ -354,9 +397,11 @@ class MainWindow(QMainWindow):
             fullscreen=self.fullscreen.isChecked(),
             vsync=self.vsync.isChecked(),
             backup_root=self.config.get("backup_root", str(Path.home() / ".splatlaunch" / "backups")),
+            runtime_options=dict(self.config.get("runtime_options", {})),
         )
         if self.current_tid in self.profiles:
             profile.extra_args = self.profiles[self.current_tid].extra_args
+        profile.extra_args = core.get_runtime_extra_args(self.config)
         return profile
 
     def save_profile(self):
@@ -368,9 +413,56 @@ class MainWindow(QMainWindow):
         self.config["vsync"] = self.vsync.isChecked()
         self.config["save_dir"] = self.save_dir.text()
         self.config["backup_root"] = self.config.get("backup_root", str(Path.home() / ".splatlaunch" / "backups"))
+        self.config["runtime_options"] = self.config.get("runtime_options", {})
         core.save_config(self.config)
         self.profiles[self.current_tid] = self._current_profile()
         core.save_profiles(self.profiles)
+
+    def apply_performance_preset(self):
+        option = self.performance_combo.currentText()
+        if option == "Performance":
+            opts = {
+                "docked_mode": False,
+                "resolution": "720p",
+                "res_scale": 1,
+                "ptc": False,
+                "memory_mapping": "HostMapped",
+                "graphics_api": "Vulkan",
+                "audio": "SDL3",
+                "aa": "None",
+                "filtering": "Bilinear",
+                "anisotropy": 4,
+                "texture_recompression": False,
+            }
+        else:
+            opts = {
+                "docked_mode": True,
+                "resolution": "1080p",
+                "res_scale": 1,
+                "ptc": False,
+                "memory_mapping": "HostMapped",
+                "graphics_api": "Vulkan",
+                "audio": "SDL3",
+                "aa": "None",
+                "filtering": "Bilinear",
+                "anisotropy": 4,
+                "texture_recompression": False,
+            }
+        self.config["runtime_options"] = opts
+        if option == "Performance":
+            self.width.setValue(1280)
+            self.height.setValue(720)
+        else:
+            self.width.setValue(1920)
+            self.height.setValue(1080)
+        self.fullscreen.setChecked(False)
+        self.vsync.setChecked(True)
+        self.config["width"] = self.width.value()
+        self.config["height"] = self.height.value()
+        self.config["fullscreen"] = False
+        self.config["vsync"] = True
+        core.save_config(self.config)
+        QMessageBox.information(self, "Performance preset", f"Applied {option} preset.")
 
     def backup(self):
         if not self.current_tid:
@@ -409,7 +501,11 @@ class MainWindow(QMainWindow):
         if target.exists():
             QMessageBox.warning(self, "Restore", "The save folder already exists. Pick a different target or clear it first.")
             return
-        shutil.copytree(selected, target)
+        try:
+            core.restore_backup(str(target), str(selected))
+        except FileExistsError as exc:
+            QMessageBox.warning(self, "Restore", str(exc))
+            return
         QMessageBox.information(self, "Restore", f"Restored backup to {target}")
 
     def refresh_gallery(self):
@@ -437,6 +533,39 @@ class MainWindow(QMainWindow):
         self.config["runtime_exe"] = self.runtime_edit.text()
         core.save_config(self.config)
 
+    def refresh_mods(self):
+        self.mod_list.clear()
+        if not self.current_tid:
+            self.mod_list.addItem("Select a title to view mods.")
+            return
+        root = Path(self.root_edit.text())
+        mods = core.list_mods(root, self.current_tid)
+        if not mods:
+            self.mod_list.addItem("No mods found in mods/contents/<titleID>.")
+            return
+        for mod in mods:
+            label = f"{mod['name']} | {'enabled' if mod['enabled'] else 'disabled'}"
+            item = QListWidgetItem(label)
+            item.setData(256, mod)
+            self.mod_list.addItem(item)
+
+    def toggle_selected_mod(self, *args):
+        if not self.current_tid:
+            return
+        item = self.mod_list.currentItem()
+        if item is None:
+            return
+        mod = item.data(256)
+        if not mod:
+            return
+        root = Path(self.root_edit.text())
+        new_state = not mod["enabled"]
+        ok = core.toggle_mod(root, self.current_tid, mod["name"], new_state)
+        if ok:
+            self.refresh_mods()
+        else:
+            QMessageBox.warning(self, "Mod manager", f"Could not toggle {mod['name']}.")
+
     def launch(self):
         if not self.current_tid:
             return
@@ -449,6 +578,9 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyleSheet(theme.STYLESHEET)
+    icon_path = Path(__file__).with_name("SplatLaunch-icon.png")
+    if icon_path.exists():
+        app.setWindowIcon(QIcon(str(icon_path)))
     win = MainWindow()
     win.show()
     sys.exit(app.exec())

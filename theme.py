@@ -1,4 +1,4 @@
-"""Splatoon-themed palette and styling for SplatLaunch."""
+﻿"""Splatoon-themed palette and styling for SplatLaunch."""
 
 S2_PINK = "#FF2E88"
 S2_TURQ = "#00E5C0"
@@ -44,14 +44,14 @@ QTabBar::tab:selected {{
     color: #071827;
     border: 1px solid rgba(255,255,255,0.2);
 }}
-QLineEdit, QSpinBox, QTextBrowser {{
+QLineEdit, QComboBox, QSpinBox, QTextBrowser, QListWidget {{
     background: {PANEL};
     border: 1px solid rgba(255,255,255,0.10);
     border-radius: 10px;
     padding: 8px 10px;
     color: {TEXT};
 }}
-QLineEdit:focus, QSpinBox:focus {{
+QLineEdit:focus, QSpinBox:focus, QComboBox:focus {{
     border: 1px solid {S2_TURQ};
 }}
 QPushButton {{
@@ -84,6 +84,9 @@ QLabel#empty-title {{
     font-size: 20px;
     font-weight: 800;
     color: {TEXT};
+}}
+QLabel#empty-message {{
+    color: {MUTED};
 }}
 QWidget#empty-state {{
     background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 rgba(255,46,136,0.12), stop:0.5 rgba(0,229,192,0.08), stop:1 rgba(245,230,0,0.08));
