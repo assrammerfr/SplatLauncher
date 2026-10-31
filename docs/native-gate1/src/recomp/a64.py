@@ -181,11 +181,13 @@ class FnEmitter:
                         self.labels.add(t)
 
         emitted_upto = None
+        emitted_labels = set()
         for idx, i in enumerate(insns):
             if i.address >= self.end:
                 break
             if i.address in self.labels:
                 self.em(f"L_{i.address:x}: ;")
+                emitted_labels.add(i.address)
             self._cur_insn = i
             try:
                 self.emit_insn(i, idx, insns)
@@ -211,6 +213,12 @@ class FnEmitter:
             pass
         elif emitted_upto is not None:
             self.em(f"c->pc = {self.end:#x}u;")
+            self.em("return;")
+        # define any labels that were referenced but never emitted (decode
+        # stalled or an undef stopped emission before reaching them)
+        for lbl in sorted(self.labels - emitted_labels):
+            self.em(f"L_{lbl:x}: a64_undef(c, {lbl:#x}u, 0, \"no_insn\");")
+            self.em(f"c->pc = {lbl:#x}u;")
             self.em("return;")
         return "\n".join(self.lines)
 
@@ -323,20 +331,18 @@ class FnEmitter:
         if m in ("adrp", "adr"):
             rd = ops[0][1]
             imm = ops[1][1]
-            if m == "adrp":
-                page = pc & ~0xFFF
-                imm = (imm & ~0xFFF)
-                expr = f"{page:#x}ull + ({imm:#x}ull)"
-            else:
-                expr = f"{pc:#x}ull + ({imm:#x}ull)"
+            # capstone already resolves adr/adrp immediates to absolute targets
+            expr = f"({imm:#x}ull)"
             self.put(self.wr(rd, expr))
             return
         if m in ("add", "adds", "sub", "subs", "cmp", "cmn", "neg", "negs"):
             return self._addsub(pc, m, ops)
-        if m in ("and", "ands", "orr", "orn", "eor", "eon", "bic", "bics", "tst", "teq"):
+        if m in ("and", "ands", "orr", "orn", "eor", "eon", "bic", "bics",
+                 "tst", "teq", "mvn"):
             return self._logical(pc, m, ops)
-        if m in ("mul", "madd", "msub", "mneg", "smulh", "umulh", "smull", "umull",
-                 "smaddl", "umaddl", "smsubl", "umsubl", "smnegl", "umnegl"):
+        if m in ("mul", "madd", "msub", "mneg", "smulh", "umulh",
+                 "smull", "umull", "smaddl", "umaddl", "smsubl", "umsubl",
+                 "smnegl", "umnegl"):
             return self._mul(pc, m, ops)
         if m in ("udiv", "sdiv"):
             rd, rn, rm = ops[0][1], ops[1][1], ops[2][1]
@@ -352,11 +358,14 @@ class FnEmitter:
             rd, rn, rm = ops[0][1], ops[1][1], ops[2][1]
             imm = ops[3][1]
             w = self.is_w(rd)
+            bits = 32 if w else 64
             a, b = self.rd(rn, w), self.rd(rm, w)
-            if w:
-                expr = f"(uint32_t)((({a}) >> {imm}) | (({b}) << (32 - {imm})))" if imm else f"(uint32_t)({b})"
+            # EXTR: R = ((Rn:Rm) >> imm), Rm holds the low bits
+            if imm == 0:
+                expr = b
             else:
-                expr = f"((({a}) >> {imm}) | (({b}) << (64 - {imm})))" if imm else f"({b})"
+                expr = f"((({a}) << {bits - imm}) | (({b}) >> {imm}))" if not w else \
+                    f"(uint32_t)(((uint32_t)({a}) << {bits - imm}) | ((uint32_t)({b}) >> {imm}))"
             self.put(self.wr(rd, expr, w))
             return
         if m in ("ubfx", "sbfx", "bfxil", "ubfiz", "sbfiz", "bfm", "sbfm", "ubfm",
@@ -419,6 +428,19 @@ class FnEmitter:
 
         if m in ("adc", "adcs", "sbc", "sbcs"):
             return self._adc(pc, m, ops)
+        if m in ("sxtb", "sxth", "sxtw", "uxtb", "uxth", "uxtw"):
+            rd, rn = ops[0][1], ops[1][1]
+            src_w = m in ("sxtw", "uxtw") or self.is_w(rn)
+            bits = {"sxtb": 8, "uxtb": 8, "sxth": 16, "uxth": 16,
+                    "sxtw": 32, "uxtw": 32}[m]
+            inner = self.rd(rn, src_w or m in ("sxtw", "uxtw"))
+            if m.startswith("sx"):
+                expr = f"(uint{64 if self.is_w(rd) and rd[0]=='x' or rd[0]=='x' else 64}_t)(int64_t)(int{bits}_t)(uint{bits}_t)({inner})"
+            else:
+                expr = f"(uint{bits}_t)({inner})"
+            # dest is always 64-bit for sxtw/uxtw; keep wr's own width logic
+            self.put(self.wr(rd, expr, self.is_w(rd)))
+            return
         if m in ("clz", "cls", "rbit", "rev", "rev16", "rev32", "rev64"):
             rd, rn = ops[0][1], ops[1][1]
             w = self.is_w(rd)
@@ -500,27 +522,27 @@ class FnEmitter:
                     self.put(self.wr(rd, f"{v:#x}ull"))
                 return
             raise Unsupported(pc, 0, "mov operand", m)
-        if m == "movz":
+        if m in ("movz", "movn", "movk"):
             rd, imm = ops[0][1], ops[1][1]
             shift = ops[2][1] if len(ops) > 2 else 0
-            v = (imm << shift)
+            cur_i = getattr(self, "_cur_insn", None)
+            if cur_i is not None and len(cur_i.operands) > 1:
+                sh = cur_i.operands[1].shift
+                if sh.type == ARM64_SFT_LSL:
+                    shift = sh.value
             w = self.is_w(rd)
-            self.put(self.wr(rd, f"{v:#x}ull" if not w else f"{v & 0xFFFFFFFF:#x}u", w))
-            return
-        if m == "movn":
-            rd, imm = ops[0][1], ops[1][1]
-            shift = ops[2][1] if len(ops) > 2 else 0
-            v = ~(imm << shift)
-            w = self.is_w(rd)
-            if w:
-                self.put(self.wr(rd, f"{v & 0xFFFFFFFF:#x}u", True))
-            else:
-                self.put(self.wr(rd, f"{v & ((1 << 64) - 1):#x}ull", False))
-            return
-        if m == "movk":
-            rd, imm = ops[0][1], ops[1][1]
-            shift = ops[2][1] if len(ops) > 2 else 0
-            w = self.is_w(rd)
+            if m == "movz":
+                v = (imm << shift)
+                self.put(self.wr(rd, f"{v:#x}ull" if not w else f"{v & 0xFFFFFFFF:#x}u", w))
+                return
+            if m == "movn":
+                v = ~(imm << shift)
+                if w:
+                    self.put(self.wr(rd, f"{v & 0xFFFFFFFF:#x}u", True))
+                else:
+                    self.put(self.wr(rd, f"{v & ((1 << 64) - 1):#x}ull", False))
+                return
+            # movk
             mask = 0xFFFF << shift
             if w:
                 cur = f"(uint32_t)c->x[{self.ridx(rd)}]"
@@ -573,8 +595,7 @@ class FnEmitter:
         cc = self.cond_tok(i)
         zero = "0u" if w else "0ull"
         if m in ("cset", "csetm"):
-            # cset rd, cond  == csinc rd, zr, zr, inv(cond)
-            cc ^= 1
+            # empirical (Unicorn golden): cset rd, cond -> cond ? 1 : 0
             if m == "cset":
                 expr = f"(a64_cond(c, {cc}) ? ({zero} + 1) : {zero})"
             else:
@@ -583,20 +604,33 @@ class FnEmitter:
             return
         alias = m in ("cinc", "cinv", "cneg")
         rn = ops[1][1]
-        a = self.rd(rn, w)
+        a0 = self.rd(rn, w)
         if alias:
-            b = zero
+            b = a0          # CINC/CINV/CNEG = CSINC/INV/NEG rd, rn, rn, cond
         else:
             rm = ops[2][1]
             b = self.rd(rm, w) if isinstance(rm, str) else zero
-        # ARM: CSEL cond ? Rn : Rm; CSINC cond ? Rn+1 : Rm; CSINV cond ? ~Rn : Rm;
-        #       CSNEG cond ? -Rn : Rm
-        if m in ("csinc", "cinc"):
-            a = f"({a} + 1)" if not w else f"(uint32_t)({a} + 1)"
-        elif m in ("csinv", "cinv"):
-            a = f"(~{a})" if not w else f"(uint32_t)(~{a})"
-        elif m in ("csneg", "cneg"):
-            a = f"(-({a}))" if not w else f"(uint32_t)(-({a}))"
+        # Empirical truth table (Unicorn golden, verified directly):
+        #   CSEL  : cond ? Rn : Rm
+        #   CSINC : cond ? Rn : Rm+1    (aliases cinc/cinv/cneg add on the TRUE
+        #   CSINV : cond ? Rn : ~Rm      side because capstone prints the
+        #   CSNEG : cond ? Rn : -Rm      inverted condition for the alias)
+        if not alias:
+            if m == "csinc":
+                b = f"({b} + 1)" if not w else f"(uint32_t)({b} + 1)"
+            elif m == "csinv":
+                b = f"(~{b})" if not w else f"(uint32_t)(~{b})"
+            elif m == "csneg":
+                b = f"(-({b}))" if not w else f"(uint32_t)(-({b}))"
+            a = a0
+        else:
+            a = a0
+            if m == "cinc":
+                a = f"({a0} + 1)" if not w else f"(uint32_t)({a0} + 1)"
+            elif m == "cinv":
+                a = f"(~{a0})" if not w else f"(uint32_t)(~{a0})"
+            else:
+                a = f"(-({a0}))" if not w else f"(uint32_t)(-({a0}))"
         expr = f"(a64_cond(c, {cc}) ? ({a}) : ({b}))"
         self.put(self.wr(rd, expr, w))
 
@@ -614,10 +648,10 @@ class FnEmitter:
         else:
             b = f"({rhs[1]:#x}ull)" if not w else f"({rhs[1] & 0xFFFFFFFF:#x}u)"
         self.em(f"if (a64_cond(c, {cc})) {{")
-        if m == "ccmp":
+        if m == "ccmn":
             self._flags_add(a, b, w)
         else:
-            self._flags_sublike(a, b, w)
+            self._flags_sublike(a, b, w)   # ccmp compares via a - b like CMP
         self.em("    } else {")
         self.em(f"        c->n = {(nzcv >> 3) & 1}; c->z = {(nzcv >> 2) & 1}; "
                 f"c->c = {(nzcv >> 1) & 1}; c->v = {nzcv & 1};")
@@ -733,7 +767,10 @@ class FnEmitter:
             rhs = ops[2] if len(ops) > 2 else ops[1]
             setflags = m in ("ands", "bics")
             op = {"and": "&", "ands": "&", "bic": "&~", "bics": "&~",
-                  "orr": "|", "orn": "|~", "eor": "^", "eon": "^~"}[m]
+                  "orr": "|", "orn": "|~", "eor": "^", "eon": "^~"}.get(m, "&")
+        if m == "mvn":
+            # MVN rd, rn{, shift} -> ~(shifted rn); rhs carries the rn operand
+            pass
         toks = [rn, rd]
         if rhs[0] == "reg":
             toks.append(rhs[1])
@@ -758,7 +795,10 @@ class FnEmitter:
                 elif sh.type == ARM64_SFT_ROR and sh.value:
                     b = f"a64ror{32 if w else 64}({b}, {sh.value})"
         # BSL/BSL16/etc appear as 'bsl' handled by simd; here standard ops
-        expr = f"({a} {op} {b})"
+        if m == "mvn":
+            expr = f"(~{b})" if not w else f"(uint32_t)(~{b})"
+        else:
+            expr = f"({a} {op} {b})"
         if setflags:
             if w:
                 self.em(f"c->n = ((uint32_t){expr} >> 31) & 1; c->z = ((uint32_t){expr} == 0);")
@@ -781,8 +821,14 @@ class FnEmitter:
             f = "a64_smulh" if m == "smulh" else "a64_umulh"
             self.put(self.wr(rd, f"{f}({self.rd(rn)}, {self.rd(rm)})"))
             return
-        if m in ("madd", "msub", "mneg"):
-            rn, ra, rm = ops[1][1], ops[2][1], ops[3][1]
+        if m == "mneg":
+            rd = ops[0][1]
+            rn, rm = ops[1][1], ops[2][1]
+            w = self.is_w(rd)
+            self.put(self.wr(rd, f"(0 - ({self.rd(rn, w)} * {self.rd(rm, w)}))", w))
+            return
+        if m in ("madd", "msub"):
+            rn, rm, ra = ops[1][1], ops[2][1], ops[3][1]
             w = self.is_w(rd)
             a, b, r = self.rd(rn, w), self.rd(rm, w), self.rd(ra, w)
             if m == "madd":
@@ -862,9 +908,19 @@ class FnEmitter:
         w = self.is_w(rd)
         bits = 32 if w else 64
         a = self.rd(ops[1][1], w)
-        if m in ("ubfx", "sbfx", "bfxil"):
+        if m in ("ubfx", "sbfx", "bfxil", "bfi"):
             lsb = ops[2][1]
             width = ops[3][1]
+            if m == "bfi":
+                mask = (((1 << width) - 1) << lsb)
+                dst = self.rd(rd, w)
+                bitsx = 32 if w else 64
+                inner = f"(((uint{bitsx}_t)({a}) & {((1 << width) - 1):#x}{'ull' if bitsx==64 else 'u'}) << {lsb})"
+                expr = f"(({dst} & ~{mask:#x}{'ull' if bitsx==64 else 'u'}) | ({inner}))"
+                if bitsx == 32:
+                    expr = f"(uint32_t)({expr})"
+                self.put(self.wr(rd, expr, w))
+                return
             if m == "ubfx":
                 expr = f"((uint{bits}_t)(({a}) >> {lsb}))" + (f" & {(1 << width) - 1:#x}u" if width < bits else "")
                 expr = f"(((uint{bits}_t)({a}) >> {lsb}) & {((1 << width) - 1):#x}ull)" if bits == 64 else \
@@ -1257,20 +1313,18 @@ class FnEmitter:
                     self.em(f"c->d[{rd[1:]}] = f64b({v:.10e}); c->dhi[{rd[1:]}] = 0;")
                 return
             if src[0] == "reg":
-                if rd[0] in ("x", "w") and src[1][0] in ("d", "s"):   # gpr -> fpr
-                    if src[1][0] == "s":
-                        self.em(f"c->d[{rd[1:]}] = (uint64_t)(uint32_t)c->x[{self.ridx(src[1])}];" if rd[0] == "w" else f"c->d[{rd[1:]}] = c->x[{self.ridx(src[1])}];")
-                    else:
-                        if rd[0] == "w":
-                            store32(rd, f"u32f((uint32_t)c->x[{self.ridx(src[1])}])")
-                        else:
-                            store64(rd, f"u64f(c->x[{self.ridx(src[1])}])")
-                    return
-                if rd[0] in ("d", "s") and src[1][0] in ("x", "w"):   # fpr -> gpr
-                    if src[1][0] == "w" or rd[0] == "s":
+                if rd[0] in ("x", "w") and src[1][0] in ("d", "s"):   # FP -> GPR (bit move)
+                    if src[1][0] == "s" or rd[0] == "w":
                         self.put(self.wr(rd, f"(uint32_t)c->d[{self.ridx(src[1])}]", True))
                     else:
                         self.put(self.wr(rd, f"c->d[{self.ridx(src[1])}]"))
+                    return
+                if rd[0] in ("d", "s") and src[1][0] in ("x", "w"):   # GPR -> FP (bit move)
+                    srcv = self.rd(src[1])
+                    if rd[0] == "s":
+                        self.em(f"c->d[{self.ridx(rd)}] = (uint64_t)(uint32_t)({srcv});")
+                    else:
+                        self.em(f"c->d[{self.ridx(rd)}] = (uint64_t)({srcv});")
                     return
                 # fpr -> fpr
                 if rd[0] == "s" and src[1][0] == "s":

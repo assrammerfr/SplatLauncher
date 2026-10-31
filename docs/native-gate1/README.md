@@ -22,3 +22,9 @@ No game files, no keys, no firmware in this folder. No launcher code changed.
 - New build tools: tools/build.py, tools/fixup_gen.py, tools/build.bat.
 - Generator re-ran at 23:31, sdk_gen_*.c outputs grew (e.g. sdk_gen_000.c to ~19 MB) — generated outputs NOT uploaded, source only.
 - Gate 1 still NOT passed — first runnable unit to nnMain not yet reported.
+
+## Update 2026-10-31 00:12 CST — differential test passes
+- Recompiler updated: a64.py 65,131 B (csel/ccmp/madd/movk fixes, plus bfi/mneg/msub/extr + extend family).
+- New: tools/diff_test.py (11,929 B), evidence/diff_report.txt: checked 240, mismatches 0.
+- Full 300k-function regeneration with the corrected emitter was running at 00:13; generated outputs NOT uploaded.
+- Gate 1 to-dos now 3/6 — recompiler with differential test checked off. First runnable unit to nnMain still pending.
