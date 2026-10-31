@@ -275,8 +275,9 @@ class FnEmitter:
             in_fn = self.addr <= t < self.end
             if in_fn:
                 self.labels.add(t)
-            cmp_ = "==" if m == "tbz" else "!="
-            self.em(f"if (((({self.rd(reg, True)} >> {bit}) & 1) {cmp_} 1)) {{")
+            # tbz branches when the bit is ZERO, tbnz when it is ONE
+            cmp_ = "!=" if m == "tbz" else "=="
+            self.em(f"if (((({self.rd(reg, self.is_w(reg))} >> {bit}) & 1) {cmp_} 1)) {{")
             if in_fn:
                 self.lines.append(f"        goto L_{t:x};")
             else:
@@ -289,9 +290,13 @@ class FnEmitter:
             self.em("return;")
             return
         if m == "blr":
-            self.em(f"c->x[30] = {nxt:#x}u;")
-            self.em(f"c->pc = {self.rd(ops[0][1])};")
-            self.em("return;")
+            # must keep THIS frame alive (like _call): an unwind here would
+            # leave the callee's return to a mid-function pc with no frame
+            # whose loop could resume it inline (observed unmapped resume).
+            t = self.rd(ops[0][1])
+            self.em(f"{{ uint64_t __r = {nxt:#x}u; c->x[30] = __r; c->pc = {t};")
+            self.em("  while (c->pc != __r && c->pc != A64_STOP) fn_dispatch(c);")
+            self.em("  if (c->pc != __r) return; }")
             return
         if m == "ret":
             rn = ops[0][1] if ops else "x30"
@@ -316,7 +321,13 @@ class FnEmitter:
 
         # ---- hints / barriers / prefetch ----
         if m in ("nop", "yield", "wfe", "wfi", "sev", "sevl", "isb", "dsb", "dmb",
-                 "clrex", "sb", "esb", "psb", "tsb", "csdb", "hint"):
+                 "clrex", "sb", "esb", "psb", "tsb", "csdb", "hint",
+                 "xpaclri", "xpaci", "xpacd", "bti",
+                 "pacia1716", "autia1716", "pacib1716", "autib1716",
+                 "dc", "ic", "at", "tlbi"):
+            # hints, barriers, cache/TLB maintenance, pointer-auth NOPs:
+            # host memory is coherent and we implement no PAC/MTE, so these
+            # are architecturally no-ops here.
             return
 
         # ---- MRS / MSR ----
@@ -408,8 +419,41 @@ class FnEmitter:
                  "frintz", "frinta", "frintx", "frinti", "fnm", "fms", "fmad", "fmia",
                  "fminp", "fmaxp", "fminnm", "fcvtas", "fcvtau", "fcvtms", "fcvtmu",
                  "fcvtns", "fcvtnu", "fcvtps", "fcvtpu", "frecpe", "frecps", "frsqrte",
-                 "fmulx", "fdivr" if False else "fdivr"):
+                 "fmulx", "fnmul", "fdivr" if False else "fdivr"):
             return self._fp(pc, m, ops, i)
+
+        # ---- SIMD immediate: movi vd.<arr>, #imm[, lsl #n] ----
+        if m == "movi":
+            rd = ops[0][1]
+            head = i.op_str.split(",")[0].strip()
+            arr = head.split(".")[1] if "." in head else "2d"
+            imm_tok = [o[1] for o in ops if o[0] == "imm"]
+            if not imm_tok or not isinstance(imm_tok[0], int):
+                raise Unsupported(pc, word, "movi imm", m)
+            imm = imm_tok[0]
+            if "lsl" in i.op_str:
+                try:
+                    imm <<= int(i.op_str.rsplit("#", 1)[1])
+                except (ValueError, IndexError):
+                    raise Unsupported(pc, word, "movi lsl", m)
+            vi = imm & ((1 << 64) - 1)
+            idx = self.ridx(rd)
+            if arr in ("2d", "1d"):
+                self.em(f"c->d[{idx}] = {vi:#x}ull;")
+                if arr == "2d":
+                    self.em(f"c->dhi[{idx}] = {vi:#x}ull;")
+            else:
+                lane_bits = {"4s": 32, "2s": 32, "8h": 16, "4h": 16,
+                             "16b": 8, "8b": 8}.get(arr)
+                if lane_bits is None:
+                    raise Unsupported(pc, word, f"movi arr '{arr}'", m)
+                lane = vi & ((1 << lane_bits) - 1)
+                rep = sum(lane << (lane_bits * k) for k in range(64 // lane_bits))
+                upper = arr in ("4s", "8h", "16b")
+                self.em(f"c->d[{idx}] = {rep:#x}ull;")
+                self.em(f"c->dhi[{idx}] = {rep:#x}ull;" if upper
+                        else f"c->dhi[{idx}] = 0;")
+            return
 
         # ---- SIMD integer / crypto ----
         if m in ("dup", "ins", "umov", "smov", "mov", "tbl", "tbx", "ext", "zip1", "zip2",
@@ -421,11 +465,15 @@ class FnEmitter:
                  "smaxp", "umaxp", "sminp", "uminp", "smax", "umax", "smin", "umin",
                  "fadd", "fsub", "fmul", "fdiv", "fmax", "fmin", "fabd", "fabe",
                  "scvtf", "ucvtf", "fcvtzs", "fcvtzu", "sqxtn", "uqxtn", "sqxtun",
-                 "sxtl", "sxtl2", "uxtl", "uxtl2", "shll", "shll2", "rev64", "rev32",
-                 "rev16", "pmull", "pmull2", "pmul", "uadalp", "sadalp", "uaddw", "saddw",
+                 "sxtl", "sxtl2", "uxtl", "uxtl2", "shll", "shll2",
+                 "pmull", "pmull2", "pmul", "uadalp", "sadalp", "uaddw", "saddw",
                  "usubw", "ssubw", "sadalp"):
             return self._simd(pc, m, ops, i)
 
+        if m in ("ngc", "ngcs"):
+            # ngc rd, rm == sbc rd, xzr, rm
+            return self._adc(pc, "sbc" if m == "ngc" else "sbcs",
+                             [ops[0], (ops[1][0], "xzr"), ops[1]])
         if m in ("adc", "adcs", "sbc", "sbcs"):
             return self._adc(pc, m, ops)
         if m in ("sxtb", "sxth", "sxtw", "uxtb", "uxth", "uxtw"):
@@ -443,6 +491,9 @@ class FnEmitter:
             return
         if m in ("clz", "cls", "rbit", "rev", "rev16", "rev32", "rev64"):
             rd, rn = ops[0][1], ops[1][1]
+            if rd.startswith("v"):
+                # vector form: SIMD rev* is not implemented yet, fail honestly
+                raise Unsupported(pc, word, f"simd '{m}'", m)
             w = self.is_w(rd)
             bits = 32 if w else 64
             if m == "clz":
@@ -471,7 +522,13 @@ class FnEmitter:
 
     # =============== calls ===============
     def _call(self, target, nxt):
-        self.em(f"{{ uint64_t __r = {nxt:#x}u; c->x[30] = __r; c->pc = {target:#x}u; fn_dispatch(c); if (c->pc != __r) return; }}")
+        # PLT / host / tail-chain redirects change c->pc before the callee's
+        # own return address comes back. Keep dispatching in THIS frame until
+        # __r returns: unwinding here would leave a mid-function return
+        # address with no frame to resume (observed: resume pc not in table).
+        self.em(f"{{ uint64_t __r = {nxt:#x}u; c->x[30] = __r; c->pc = {target:#x}u;")
+        self.em("  while (c->pc != __r && c->pc != A64_STOP) fn_dispatch(c);")
+        self.em("  if (c->pc != __r) return; }")
 
     # =============== flag helpers (statements) ===============
     def _flags_add(self, a, b, w):
@@ -1184,38 +1241,43 @@ class FnEmitter:
                 self.em(f"c->x[{breg}] = ({base} + ({imm}));")
 
     def _atomic(self, pc, m, ops, i):
-        # MVP: model as plain load/store + 0 to the status reg (single-threaded bring-up)
-        if m in ("ldar", "ldxr", "ldaxr"):
-            rt, mem = ops[0][1], ops[1]
-            mm = mem[1]
-            addr = self._mem_expr(mm, i, ops)
+        # single-threaded bring-up: exclusives / ordered accesses become
+        # plain loads and stores (exclusive store status = 0 = "stored").
+        # Width comes from the name suffix (b = byte, h = half).
+        width = 8 if m.endswith("b") else (16 if m.endswith("h") else 0)
+        is_lse = m.startswith(("ldadd", "ldclr", "ldeor", "ldset", "swp"))
+        if not is_lse and not m.startswith("cas"):
+            if m.startswith("ld"):
+                rt = ops[0][1]
+                addr = self._mem_expr(ops[1][1], i, ops)
+                w = self.is_w(rt)
+                if width == 8:
+                    expr = f"ld8(c, {addr})"
+                elif width == 16:
+                    expr = f"ld16(c, {addr})"
+                elif w:
+                    expr = f"(uint64_t)(uint32_t)ld32(c, {addr})"
+                else:
+                    expr = f"ld64(c, {addr})"
+                self.put(self.wr(rt, expr, w))
+                return
+            # store: [rt, mem] or exclusive [ws, rt, mem]
+            if len(ops) == 3:
+                ws, rt, mem = ops[0][1], ops[1][1], ops[2][1]
+            else:
+                ws, rt, mem = None, ops[0][1], ops[1][1]
+            addr = self._mem_expr(mem, i, ops)
             w = self.is_w(rt)
-            expr = f"ld64(c, {addr})" if not w else f"(uint64_t)(uint32_t)ld32(c, {addr})"
-            if m in ("ldaxr", "ldxr") and len(ops) > 2 and ops[2][0] == "reg":
-                pass
-            self.put(self.wr(rt, expr, w))
-            return
-        if m in ("stxr", "stlxr"):
-            # stxr ws, rt, [xn]
-            ws = ops[0][1]
-            rt = ops[1][1]
-            mem = ops[2]
-            mm = mem[1]
-            addr = self._mem_expr(mm, i, ops)
-            w = self.is_w(rt)
-            f = "st32" if w else "st64"
+            if width == 8:
+                f = "st8"
+            elif width == 16:
+                f = "st16"
+            else:
+                f = "st32" if w else "st64"
             val = self.rd(rt, w) if rt.lower() not in ("xzr", "wzr") else ("0u" if w else "0ull")
             self.em(f"{f}(c, {addr}, {val});")
-            self.put(self.wr(ws, "0ull", True))
-            return
-        if m in ("stlr",):
-            rt, mem = ops[0][1], ops[1]
-            mm = mem[1]
-            addr = self._mem_expr(mm, i, ops)
-            w = self.is_w(rt)
-            f = "st32" if w else "st64"
-            val = self.rd(rt, w)
-            self.em(f"{f}(c, {addr}, {val});")
+            if ws is not None:
+                self.put(self.wr(ws, "0ull", True))
             return
         if m in ("ldadd", "ldaddl", "ldclr", "ldclrl", "ldeor", "ldeorl", "ldset",
                  "ldsetl", "swp", "swpl"):
@@ -1229,8 +1291,8 @@ class FnEmitter:
             else:
                 raise Unsupported(pc, 0, f"atomic arity {len(ops)}", m)
             w = self.is_w(rt)
-            f = "ld32" if w else "ld64"
-            sf = "st32" if w else "st64"
+            f = {8: "ld8", 16: "ld16"}.get(width, "ld32" if w else "ld64")
+            sf = {8: "st8", 16: "st16"}.get(width, "st32" if w else "st64")
             self.em(f"{{ uint{32 if w else 64}_t __old = ({f})(c, {addr});")
             base = m.replace("l", "", 1) if False else m
             opname = m[2:] if m.startswith("ld") else m[2:]
@@ -1247,6 +1309,8 @@ class FnEmitter:
                 new = self.rd(src, w)
             else:
                 raise Unsupported(pc, 0, m, m)
+            if width:
+                new = f"(({new}) & {(1 << width) - 1:#x}u)"
             self.em(f"    {sf}(c, {addr}, (uint{32 if w else 64}_t)({new}));")
             self.put(self.wr(rt, "__old", w))
             self.em("}")
@@ -1367,10 +1431,21 @@ class FnEmitter:
             return
         if m in ("fmadd", "fmsub", "fnmadd", "fnmsub"):
             rn, rm, ra = ops[1][1], ops[2][1], ops[3][1]
+            # NOTE: u32f/u64f at module level are int bit-converters; the C
+            # helpers of the same name take c->d[] expressions.
             if rd[0] == "s":
-                store32(rd, f"a64_{m}_32({u32f(rn)}, {u32f(rm)}, {u32f(ra)})")
+                store32(rd, f"a64_{m}_32(u32f(c->d[{rn[1:]}]), "
+                            f"u32f(c->d[{rm[1:]}]), u32f(c->d[{ra[1:]}]))")
             else:
-                store64(rd, f"a64_{m}_64({u64f(rn)}, {u64f(rm)}, {u64f(ra)})")
+                store64(rd, f"a64_{m}_64(u64f(c->d[{rn[1:]}]), "
+                            f"u64f(c->d[{rm[1:]}]), u64f(c->d[{ra[1:]}]))")
+            return
+        if m == "fnmul":
+            rn, rm = ops[1][1], ops[2][1]
+            if rd[0] == "s":
+                store32(rd, f"negf(u32f(c->d[{rn[1:]}]) * u32f(c->d[{rm[1:]}]))")
+            else:
+                store64(rd, f"negd(u64f(c->d[{rn[1:]}]) * u64f(c->d[{rm[1:]}]))")
             return
         if m in ("fcmp", "fcmpe"):
             rn = ops[0][1]
@@ -1388,17 +1463,25 @@ class FnEmitter:
         if m in ("fcmp" ,"fcmpe"):
             return
         if m in ("fccmp", "fccmn"):
-            rn, cond, nzcv = ops[1][1], ops[3][1] if len(ops) > 3 else ops[2][1], None
-            # capstone: fcmp-like arg order: fccmp x, y, #nzcv, cond
-            rhs = ops[1][1]
-            nz = ops[2][1]
-            cond = ops[3][1]
-            cc = CONDC[cond]
-            a = f"u64f(c->d[{ops[0][1][1:]}])" if ops[0][1][0] == "d" else f"u32f(c->d[{ops[0][1][1:]}])"
-            raise Unsupported(pc, 0, "fccmp raw", m)
+            # capstone order: dn, dm, #nzcv (cond only in op_str). If cond
+            # holds: compare (sets NZCV); else NZCV := imm.
+            rn, rm = ops[0][1], ops[1][1]
+            nz_toks = [o[1] for o in ops if o[0] == "imm"]
+            if not nz_toks:
+                raise Unsupported(pc, word, "fccmp no imm", m)
+            nz = int(nz_toks[0])
+            cc = self.cond_tok(i)
+            fp32 = rn[0] == "s"
+            a = f"u32f(c->d[{rn[1:]}])" if fp32 else f"u64f(c->d[{rn[1:]}])"
+            b = f"u32f(c->d[{rm[1:]}])" if fp32 else f"u64f(c->d[{rm[1:]}])"
+            self.em(f"if (a64_cond(c, {cc})) a64_fcmp(c, {32 if fp32 else 64}, {a}, {b});")
+            self.em(f"else {{ c->n = ({nz} >> 3) & 1; c->z = ({nz} >> 2) & 1; "
+                    f"c->c = ({nz} >> 1) & 1; c->v = {nz} & 1; }}")
+            return
         if m == "fcsel":
-            rn, rm, cond = ops[1][1], ops[2][1], ops[3][1]
-            cc = CONDC[cond]
+            # capstone omits the condition from insn.operands -> use op_str
+            rn, rm = ops[1][1], ops[2][1]
+            cc = self.cond_tok(i)
             self.em(f"c->d[{rd[1:]}] = a64_cond(c, {cc}) ? c->d[{rm[1:]}] : c->d[{rn[1:]}];")
             return
         if m == "fcvt":

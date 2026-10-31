@@ -19,25 +19,41 @@ EXE = os.path.join(ROOT, "build", "splatnative.exe")
 
 
 def vc_env():
-    out = subprocess.run(
-        ["cmd", "/c", f'"{VCVARS}" >nul && set'],
-        capture_output=True, text=True, shell=False)
+    """Capture the vcvars64 environment via a temp .bat (robust to spaces)."""
+    bat = os.path.join(ROOT, "build", "_vcvars.bat")
+    with open(bat, "w") as f:
+        f.write('@echo off\r\ncall "' + VCVARS + '" >nul 2>&1\r\nset\r\n')
+    out = subprocess.run(["cmd", "/c", bat], capture_output=True, text=True,
+                         cwd=ROOT)
     env = {}
     for line in out.stdout.splitlines():
-        if "=" in line:
+        if "=" in line and not line.startswith("[" ):
             k, _, v = line.partition("=")
             env[k] = v
-    if "INCLUDE" not in env:
+    if "INCLUDE" not in env or "PATH" not in env:
         print(out.stdout[:2000], out.stderr[:2000])
         raise SystemExit("vcvars64 failed")
     return env
 
 
+def find_tool(name, env):
+    for d in env["PATH"].split(";"):
+        d = d.strip().strip('"')
+        if not d:
+            continue
+        p = os.path.join(d, name)
+        if os.path.exists(p):
+            return p
+    raise SystemExit(f"{name} not found on vcvars PATH")
+
+
 def compile_one(src, env):
     obj = os.path.join(OBJ, os.path.splitext(os.path.basename(src))[0] + ".obj")
-    cmd = ["cl", "/nologo", "/c", "/O2", "/bigobj", "/MD",
+    cmd = [find_tool("cl.exe", env), "/nologo", "/c", "/O2", "/bigobj", "/MD",
            "/I" + os.path.join(ROOT, "src", "runtime"),
            src, "/Fo" + obj]
+    if os.path.exists(obj) and os.path.getmtime(obj) >= os.path.getmtime(src):
+        return src, True, "skip (fresh)"
     r = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=ROOT)
     ok = r.returncode == 0 and os.path.exists(obj)
     return src, ok, r.stdout + r.stderr
@@ -57,6 +73,16 @@ def main():
         os.path.join(ROOT, "src", "runtime", "vendor", "lz4.c"),
     ] + sorted(glob.glob(os.path.join(ROOT, "build", "gen", "*.c")))
     print(f"[build] {len(sources)} translation units, jobs={args.jobs}")
+
+    # drop objs whose source no longer exists (shards deleted by a full regen)
+    keep = {os.path.splitext(os.path.basename(s))[0] + ".obj" for s in sources}
+    orphans = [p for p in glob.glob(os.path.join(OBJ, "*.obj"))
+               if os.path.basename(p) not in keep]
+    for p in orphans:
+        os.remove(p)
+    if orphans:
+        print(f"[build] removed {len(orphans)} orphaned objs: "
+              + ", ".join(os.path.basename(p) for p in orphans))
 
     failures = []
     done = 0
@@ -82,7 +108,7 @@ def main():
 
     objs = sorted(glob.glob(os.path.join(OBJ, "*.obj")))
     print(f"[build] linking {len(objs)} objects ...")
-    cmd = ["cl", "/nologo", *[os.path.join(OBJ, os.path.basename(o)) for o in objs],
+    cmd = [find_tool("cl.exe", env), "/nologo", *[os.path.join(OBJ, os.path.basename(o)) for o in objs],
            "/Fe" + EXE, "/link", "/SUBSYSTEM:CONSOLE"]
     # cl link mode takes sources; pass obj files directly
     r = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=ROOT)

@@ -45,20 +45,27 @@ void a64_svc(A64Ctx* c, uint64_t imm);
 void a64_break(A64Ctx* c, uint64_t pc, uint64_t word);
 void a64_undef(A64Ctx* c, uint64_t pc, uint64_t word, const char* mn);
 void a64_unmapped(A64Ctx* c);
+/* Function-level call trace ring (fn_dispatch pushes pc; dumped on stop). */
+extern uint64_t g_trace[1024];
+extern unsigned g_trace_i;
+void a64_dump_trace(void);
+/* pc watch (fn_dispatch calls a64_hit_watch when pc == g_watch). */
+extern uint64_t g_watch;
+void a64_hit_watch(A64Ctx* c);
 void a64_mrs_unknown(A64Ctx* c, const char* name);
 void a64_msr_unknown(A64Ctx* c, const char* name, uint64_t val);
 uint64_t a64_ticks(void);
 void a64_fcmp(A64Ctx* c, int size, double a, double b);
-int64_t a64_f2i_z_s(int fsize, double v);
-int64_t a64_f2i_a_s(int fsize, double v);
-int64_t a64_f2i_m_s(int fsize, double v);
-int64_t a64_f2i_n_s(int fsize, double v);
-int64_t a64_f2i_p_s(int fsize, double v);
-uint64_t a64_f2i_z_u(int fsize, double v);
-uint64_t a64_f2i_a_u(int fsize, double v);
-uint64_t a64_f2i_m_u(int fsize, double v);
-uint64_t a64_f2i_n_u(int fsize, double v);
-uint64_t a64_f2i_p_u(int fsize, double v);
+int64_t a64_f2iz_s(int fsize, double v);
+int64_t a64_f2ia_s(int fsize, double v);
+int64_t a64_f2im_s(int fsize, double v);
+int64_t a64_f2in_s(int fsize, double v);
+int64_t a64_f2ip_s(int fsize, double v);
+uint64_t a64_f2iz_u(int fsize, double v);
+uint64_t a64_f2ia_u(int fsize, double v);
+uint64_t a64_f2im_u(int fsize, double v);
+uint64_t a64_f2in_u(int fsize, double v);
+uint64_t a64_f2ip_u(int fsize, double v);
 double a64_i2f_s(int fbits, int ibits, uint64_t v);
 double a64_i2f_u(int fbits, int ibits, uint64_t v);
 uint32_t a64_crc32(const char* name, uint32_t a, uint32_t b);
@@ -87,10 +94,10 @@ static inline int a64_cond(A64Ctx* c, int cond) {
     return r;
 }
 
-static inline uint64_t a64_lsl64(uint64_t v, uint64_t n) { return v << (n & 63); }
-static inline uint32_t a64_lsl32(uint32_t v, uint32_t n) { return v << (n & 31); }
-static inline uint64_t a64_lsr64(uint64_t v, uint64_t n) { return v >> (n & 63); }
-static inline uint32_t a64_lsr32(uint32_t v, uint32_t n) { return v >> (n & 31); }
+static inline uint64_t a64lsl64(uint64_t v, uint64_t n) { return v << (n & 63); }
+static inline uint32_t a64lsl32(uint32_t v, uint32_t n) { return v << (n & 31); }
+static inline uint64_t a64lsr64(uint64_t v, uint64_t n) { return v >> (n & 63); }
+static inline uint32_t a64lsr32(uint32_t v, uint32_t n) { return v >> (n & 31); }
 static inline uint64_t a64asr64(uint64_t v, uint64_t n) {
     return (uint64_t)((int64_t)v >> (n & 63));
 }
