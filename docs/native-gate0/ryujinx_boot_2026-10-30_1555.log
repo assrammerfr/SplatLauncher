@@ -1,0 +1,717 @@
+00:00:00.726 |I| Configuration LogValueChange: ResScale set to: 1
+00:00:00.734 |I| Configuration LogValueChange: ResScaleCustom set to: 1
+00:00:00.734 |I| Configuration LogValueChange: MaxAnisotropy set to: 4
+00:00:00.737 |I| Configuration LogValueChange: AspectRatio set to: Fixed16x9
+00:00:00.743 |I| Configuration LogValueChange: PreferredGpu set to: 0x1002_0x731F
+00:00:00.745 |I| Configuration LogValueChange: AntiAliasing set to: SmaaLow
+00:00:00.748 |I| Configuration LogValueChange: ScalingFilterLevel set to: 100
+00:00:00.750 |I| Configuration LogValueChange: CustomVSyncInterval set to: 120
+00:00:00.750 |I| Configuration LogValueChange: EnableShaderCache set to: True
+00:00:00.750 |I| Configuration LogValueChange: EnableTextureRecompression set to: True
+00:00:00.750 |I| Configuration LogValueChange: EnableMacroHLE set to: True
+00:00:00.752 |I| Configuration LogValueChange: Language set to: AmericanEnglish
+00:00:00.755 |I| Configuration LogValueChange: Region set to: USA
+00:00:00.755 |I| Configuration LogValueChange: TimeZone set to: UTC
+00:00:00.759 |I| Configuration LogValueChange: SystemTimeOffset set to: -692
+00:00:00.759 |I| Configuration LogValueChange: UseInputGlobalConfig set to: True
+00:00:00.759 |I| Configuration LogValueChange: TickScalar set to: 100
+00:00:00.760 |I| Configuration LogValueChange: EnableFsIntegrityChecks set to: True
+00:00:00.763 |I| Configuration LogValueChange: AudioBackend set to: SDL3
+00:00:00.763 |I| Configuration LogValueChange: AudioVolume set to: 1
+00:00:00.767 |I| Configuration LogValueChange: MemoryManagerMode set to: HostMapped
+00:00:00.769 |I| Configuration LogValueChange: UseHypervisor set to: True
+00:00:00.769 |I| Configuration LogValueChange: GCLowLatency set to: True
+00:00:00.778 |I| Configuration LogValueChange: LdnPassphrase set to: 
+00:00:00.778 |I| Configuration LogValueChange: LdnServer set to: 
+00:00:00.781 |I| Configuration LogValueChange: GdbStubPort set to: 55555
+00:00:00.896 |N| Application PrintSplash:    ___                 __    _              
+00:00:00.896 |N| Application PrintSplash:   / _ \  __ __ __ __  / /   (_)  ___   ___ _
+00:00:00.896 |N| Application PrintSplash:  / , _/ / // // // / / _ \ / /  / _ \ / _ `/
+00:00:00.896 |N| Application PrintSplash: /_/|_|  \_, / \_,_/ /_.__//_/  /_//_/ \_, / 
+00:00:00.896 |N| Application PrintSplash:        /___/                         /___/  
+00:00:00.896 |N| Application PrintSplash: 
+00:00:00.896 |N| Application PrintSplash: That's no moon...
+00:00:00.896 |N| Application PrintSplash: 
+00:00:00.896 |N| Application PrintSystemInfo: Ryujinx Canary Version: 1.3.351
+00:00:00.896 |N| Application PrintSystemInfo: .NET Runtime: .NET 10.0.10
+00:00:00.909 |N| Application PrintSystemInfo: Operating System: Microsoft Windows 10.0.26300 (X64)
+00:00:00.909 |N| Application PrintSystemInfo: CPU: AMD Ryzen 7 3800X 8-Core Processor ; 16 logical
+00:00:00.911 |N| Application PrintSystemInfo: RAM: Total 15.9 GiB ; Available 12.4 GiB
+00:00:00.915 |N| Application PrintSystemInfo: Logs Enabled: Info, Warning, Error, Guest, Stub
+00:00:00.915 |N| Application PrintSystemInfo: Launch Mode: UserProfile
+00:00:05.829 |I| Application QueryLatestAsync: Checking for updates from: https://update.ryujinx.app/latest/query?os=win&arch=amd64&rc=canary
+00:00:06.014 |I| GUI.ApplicationLibraryThread Application ReloadGameList: Auto loading DLC & updates from: E:\Splatoon Games\
+00:00:06.472 |I| Application CheckVersionAsync: Up to date.
+00:00:00.073 |I| Gpu : Backend Threading (Auto): True
+00:00:01.183 |N| Application LoadGuestApplication: Using Firmware Version: 22.5.0
+00:00:01.183 |N| Application LoadGuestApplication: Loading content archive from 'E:\Splatoon Games\Splatoon 3.nsp'.
+00:00:01.183 |I| Application LoadGuestApplication: Loading as NSP.
+00:00:01.195 |N| Application : Loading update NCA from 'E:\Splatoon Games\Splatoon 3 v11.2.0.nsp'.
+00:00:01.200 |N| Application AddAocItem: Found AddOnContent with TitleId 0100C2500FC21066 @ 'E:\Splatoon Games\Splatoon 3 Dlc Side Order v131072.nsp'
+00:00:01.201 |N| Application AddAocItem: Found AddOnContent with TitleId 0100C2500FC21065 @ 'E:\Splatoon Games\Splatoon 3 Dlc Inkopolis v393216.nsp'
+00:00:01.246 |I| ModLoader QueryContentsDir: Searching mods for Application 0100C2500FC20000 in "C:\Users\[redacted]\AppData\Roaming\Ryujinx\mods\contents"
+00:00:01.250 |I| ModLoader QueryContentsDir: Searching mods for DLC 0100C2500FC21065 in "C:\Users\[redacted]\AppData\Roaming\Ryujinx\mods\contents"
+00:00:01.250 |I| ModLoader QueryContentsDir: Searching mods for DLC 0100C2500FC21066 in "C:\Users\[redacted]\AppData\Roaming\Ryujinx\mods\contents"
+00:00:01.253 |I| ModLoader QueryContentsDir: Searching mods for Application 0100C2500FC20000 in "C:\Users\[redacted]\AppData\Roaming\Ryujinx\sdcard\atmosphere\contents"
+00:00:01.253 |I| ModLoader QueryContentsDir: Searching mods for DLC 0100C2500FC21065 in "C:\Users\[redacted]\AppData\Roaming\Ryujinx\sdcard\atmosphere\contents"
+00:00:01.253 |I| ModLoader QueryContentsDir: Searching mods for DLC 0100C2500FC21066 in "C:\Users\[redacted]\AppData\Roaming\Ryujinx\sdcard\atmosphere\contents"
+00:00:01.260 |I| Loader Load: Loading rtld...
+00:00:01.287 |I| Loader PrintRoSectionInfo: rtld:
+    Module: 
+00:00:01.287 |I| Loader Load: Loading main...
+00:00:01.576 |I| Loader PrintRoSectionInfo: main:
+    Module: D:\home\Project\Thunder\App\Rom\NX64\Product\code\Thunder.nss
+    SDK Libraries: SDK MW+Nintendo+QREncoder-20_1_0
+                   SDK MW+Nintendo+NintendoSDK_NPLN-1_38_1-Release
+                   SDK MW+Nintendo+NintendoSDK_Google_APIs_For_NPLN-1_38_1-Release
+                   SDK MW+Nintendo+NintendoSDK_gRPC_For_NPLN-0_0_0-Release
+                   SDK MW+Nintendo+NintendoSDK_OpenSSL_For_NPLN-0_0_0-Release
+                   SDK MW+Nintendo+NintendoSDK_libcurl-20_5_22-Release
+                   SDK MW+Nintendo+PiaClone-6_32_3-Release
+                   SDK MW+Nintendo+PiaCommon-6_32_3-Release
+                   SDK MW+Nintendo+Pia-6_32_3-Release
+                   SDK MW+Nintendo+PiaLocal-6_32_3-Release
+                   SDK MW+Nintendo+PiaLan-6_32_3-Release
+                   SDK MW+Nintendo+PiaSession-6_32_3-Release
+                   SDK MW+Nintendo+PiaSync-6_32_3-Release
+                   SDK MW+Nintendo+PiaTransport-6_32_3-Release
+                   SDK MW+Nintendo+Pia_ZStandard-6_32_3-Release
+                   SDK MW+Nintendo+PiaNplnd-6_32_3-Release
+                   SDK MW+Nintendo+NintendoWare_Vfx2-20_5_22-Release
+                   SDK MW+Nintendo+NintendoWare_Font-13_3_6-Release
+                   SDK MW+Nintendo+NintendoWare_Ui2d-13_3_6-Release
+                   SDK MW+Nintendo+NintendoWare_G3d2-20_5_22-Release
+                   SDK MW+Microsoft+Havok_AI-2021_1
+                   SDK MW+Microsoft+Havok_Cloth-2021_1
+                   SDK MW+Microsoft+Havok_Animation-2021_1
+                   SDK MW+Nintendo+NintendoSDK_libz-20_5_22-Release
+00:00:01.577 |I| Loader Load: Loading sdk...
+00:00:01.616 |I| Loader PrintRoSectionInfo: sdk:
+    Module: 
+    FS SDK Version: 20.5.22
+    SDK Libraries: SDK MW+Nintendo+NintendoSDK_libz-20_5_22-Release
+                   SDK MW+Nintendo+NintendoSdk_nnSdk-20_5_22-Release
+                   SDK MW+Nintendo+NintendoSdk_BuildTarget-64Bit
+                   SDK MW+Nintendo+NintendoSDK_NVN-20_5_22-Release
+00:00:04.736 |I| Ptc Initialize: Initializing Profiled Persistent Translation Cache v7031
+		 (pid: 109, title: 0100c2500fc20000, application: 0100c2500fc20000, programIndex: 0, version: '11.2.0', kind: Application, selector: 'default', key: '11.2.0-default', enabled: False).
+00:00:04.741 |I| Application ParseCapability: Application requested cores with index range 0 to 2
+00:00:04.743 |I| Loader LoadNsos: Loading image 0 at 0x0000000008500000...
+00:00:04.749 |I| Loader LoadNsos: Loading image 1 at 0x0000000008506000...
+00:00:04.780 |I| Loader LoadNsos: Loading image 2 at 0x000000000e6fe000...
+00:00:04.791 |I| ModLoader LoadCheats: Build ids found for application 0100C2500FC20000:
+    263C3426D28AF8D8CCE29A9D2DA8FF0FF9A76456000000000000000000000000
+    6830B3A12406CB4716FEC5ADDC35D3E2DC92D212000000000000000000000000
+    574284B40C06CF1821A44857939083BEE5716820000000000000000000000000
+00:00:04.795 |I| Application .ctor: metaLoader: LibHac.Loader.MetaLoader
+00:00:04.811 |I| Application EnsureSaveData: Ensuring required savedata exists.
+00:00:04.975 |I| Loader Start: Application Loaded: Splatoon 3 v11.2.0 [0100c2500fc20000] [64-bit]
+00:00:04.977 |I| Loader Start: Process identity: Application pid=109 program=0100c2500fc20000 application=0100c2500fc20000 index=0 version=11.2.0
+00:00:04.987 |I| Application LoadGuestApplication: Garbage collector set to low latency mode.
+00:00:05.082 |I| GUI.WindowThread Hid Configure: Configured Controller ProController to Player1
+00:00:05.130 |I| GUI.WindowThread Hid SetupNpad: Connected Controller ProController to Player1
+00:00:05.136 |I| Hid HandleJoyBatteryUpdated: XInput Controller power level: SDL_POWERSTATE_CHARGING
+00:00:05.623 |N| GUI.RenderThread Gpu PrintGpuInformation: AMD Radeon RX 5700 XT (Vulkan v1.4.315, Driver: AMD 26.10.1 (AMD proprietary shader compiler))
+00:00:05.624 |N| GUI.RenderThread Gpu PrintGpuInformation: GPU Memory: 8176 MiB
+00:00:05.651 |I| GPU.MainThread Gpu LoadShaders: Loading 2385 shaders from the cache...
+00:00:11.360 |I| GPU.MainThread Gpu LoadShaders: Shader cache loaded.
+00:00:12.131 |S| {Common} ServiceAm GetAppletResourceUserId: Stubbed. {appletResourceUserId: 1}
+00:00:12.205 |S| {Common} ServiceAm AcquireForegroundRights: Stubbed. 
+00:00:12.208 |S| {Common} ServiceAm SetFocusHandlingMode: Stubbed. {unknownFlag1: False ; unknownFlag2: False ; unknownFlag3: True}
+00:00:12.212 |S| {Common} ServiceAm SetOutOfFocusSuspendingEnabled: Stubbed. {outOfFocusSuspendingEnabled: False}
+00:00:12.250 |S| {Common} ServicePctl Initialize: Stubbed. 
+00:00:19.857 |S| {Common} ServiceAm SetRestartMessageEnabled: Stubbed. {restartMessageEnabled: True}
+00:00:19.860 |S| {Common} ServiceAm SetOperationModeChangedNotification: Stubbed. {operationModeChangedNotification: True}
+00:00:19.863 |S| {Common} ServiceAm SetPerformanceModeChangedNotification: Stubbed. {performanceModeChangedNotification: True}
+00:00:20.244 |S| {Nv} ServiceNv FinishInitialize: Stubbed. 
+00:00:20.291 |I| {Common} SurfaceFlinger CreateLayerFromId: Creating layer 1
+00:00:20.294 |I| {Common} SurfaceFlinger CreateLayerFromId: Creating layer 2
+00:00:20.483 |S| {Nv} ServiceNv VsmsMapping: Stubbed. 
+00:00:20.534 |I| {Nv} Gpu Initialize: AutoDelete Cache Allocated VRAM : 2 GiB
+00:00:20.539 |S| {Nv} ServiceNv InitializeEx: Stubbed. 
+00:00:20.664 |S| {Nv} ServiceNv GetActiveSlotMask: Stubbed. 
+00:00:20.799 |S| {Nv} ServiceNv SetNvMapFd: Stubbed. 
+00:00:20.801 |S| {Nv} ServiceNv AllocGpfifoEx2: Stubbed. 
+00:00:20.803 |S| {Nv} ServiceNv AllocObjCtx: Stubbed. 
+00:00:20.806 |S| {Nv} ServiceNv SetErrorNotifier: Stubbed. 
+00:00:20.808 |S| {Nv} ServiceNv SetUserData: Stubbed. 
+00:00:20.809 |S| {Nv} ServiceNv SetTimeout: Stubbed. 
+00:00:20.812 |S| {Nv} ServiceNv SetTimeslice: Stubbed. 
+00:00:20.822 |S| {Nv} ServiceNv ZcullBind: Stubbed. 
+00:00:21.103 |S| {Common} ServiceAcc InitializeApplicationInfo: Stubbed. {TitleId: 72271243155472384}
+00:00:21.112 |W| {Common} Loader GetProcess: Process metadata for pid 110 was not found. Falling back to active application metadata.
+00:00:21.112 |S| {Common} ServiceAcc IsUserAccountSwitchLocked: Stubbed. 
+00:00:21.122 |S| {Common} ServiceNs CheckAddOnContentMountStatus: Stubbed. 
+00:00:21.142 |S| {Hid} ServiceHid SetTouchScreenResolution: Stubbed. {width: 1280 ; height: 720 ; appletResourceUserId: 1}
+00:00:21.143 |S| {Hid} ServiceHid ActivateTouchScreen: Stubbed. {appletResourceUserId: 1}
+00:00:21.208 |S| {Hid} ServiceHid ActiveNpadImpl: Stubbed. {appletResourceUserId: 1 ; revision: 5}
+00:00:21.214 |I| GUI.WindowThread Hid SetupNpad: Disconnected Controller ProController from Player1
+00:00:21.215 |W| GUI.WindowThread Hid Remap: No matching controllers found. Application requests 'ProController, Handheld, JoyconPair, JoyconLeft, JoyconRight' on 'Player1, Player2, Player3, Player4, Player5, Player6, Player7, Player8, Handheld'
+00:00:21.215 |S| {Hid} ServiceHid SetSupportedNpadIdType: Stubbed. 9 Players: Player1,Player2,Player3,Player4,Player5,Player6,Player7,Player8,Handheld
+00:00:21.217 |I| GUI.WindowThread Hid SetupNpad: Connected Controller ProController to Player1
+00:00:21.218 |S| {Hid} ServiceHid SetSupportedNpadStyleSet: Stubbed. {pid: 109 ; appletResourceUserId: 1 ; type: ProController, Handheld, JoyconPair, JoyconLeft, JoyconRight}
+00:00:23.735 |S| {Nv} ServiceNv ZbcSetTable: Stubbed. 
+00:00:23.735 |S| {Nv} ServiceNv GetActiveSlotMask: Stubbed. 
+00:00:26.873 |S| {Hid} ServiceHid ActivateMouse: Stubbed. {appletResourceUserId: 1}
+00:00:26.878 |S| {Hid} ServiceHid ActivateKeyboard: Stubbed. {appletResourceUserId: 1}
+00:00:30.592 |I| HLE.OsThread.11 AudioRenderer AcquireSessionId: Registered new renderer (0)
+00:00:30.602 |I| HLE.OsThread.11 AudioRenderer Initialize: Initializing with REV15
+00:00:30.637 |I| AudioProcessor.Worker AudioRenderer Work: Starting audio processor
+00:00:30.640 |I| AudioRendererManager.Worker AudioRenderer SendCommands: Starting audio renderer
+00:00:30.660 |I| HLE.OsThread.11 AudioRenderer Start: Starting renderer id 0
+00:00:31.609 |I| AudioProcessor.Worker Audio EnsureAudioStreamSetup: New audio stream setup with a target sample count of 240
+00:00:31.889 |S| {Common} ServiceAm SetOperationModeChangedNotification: Stubbed. {operationModeChangedNotification: True}
+00:00:31.889 |S| {Common} ServiceAm SetPerformanceModeChangedNotification: Stubbed. {performanceModeChangedNotification: True}
+00:00:31.906 |S| {Common} ServiceNs PrepareAddOnContentImpl: Stubbed. {index: 101}
+00:00:31.923 |I| {Fs} Loader OpenDataStorageByDataId: Opened AddOnContent Data TitleID=0100C2500FC21065
+00:00:31.928 |S| {Common} ServiceNs PrepareAddOnContentImpl: Stubbed. {index: 101}
+00:00:31.932 |I| {Fs} Loader OpenDataStorageByDataId: Opened AddOnContent Data TitleID=0100C2500FC21065
+00:00:31.937 |S| {Common} ServiceNs PrepareAddOnContentImpl: Stubbed. {index: 102}
+00:00:31.940 |I| {Fs} Loader OpenDataStorageByDataId: Opened AddOnContent Data TitleID=0100C2500FC21066
+00:00:31.942 |S| {Common} ServiceNs PrepareAddOnContentImpl: Stubbed. {index: 102}
+00:00:31.943 |I| {Fs} Loader OpenDataStorageByDataId: Opened AddOnContent Data TitleID=0100C2500FC21066
+00:00:40.038 |S| {Common} ServiceAcc CheckAvailability: Stubbed. 
+00:00:40.041 |S| {Common} ServiceAcc GetAccountId: Stubbed. {NetworkServiceAccountId: 51966}
+00:00:40.772 |S| {Common} ServiceAm LockExit: Stubbed. 
+00:00:40.780 |S| {Common} ServiceAm SetFocusHandlingMode: Stubbed. {unknownFlag1: True ; unknownFlag2: False ; unknownFlag3: True}
+00:00:40.780 |S| {Common} ServiceAm SetOutOfFocusSuspendingEnabled: Stubbed. {outOfFocusSuspendingEnabled: False}
+00:00:49.818 |S| {Hid} ServiceHid StartSixAxisSensor: Stubbed. {appletResourceUserId: 1 ; sixAxisSensorHandle: 131075}
+00:00:50.035 |S| {Hid} ServiceHid GetGyroscopeZeroDriftMode: Stubbed. {appletResourceUserId: 1 ; sixAxisSensorHandle: 131075 ; _gyroscopeZeroDriftMode: Standard}
+00:00:50.041 |S| {Hid} ServiceHid SetGyroscopeZeroDriftMode: Stubbed. {appletResourceUserId: 1 ; sixAxisSensorHandle: 131075 ; _gyroscopeZeroDriftMode: Tight}
+00:00:52.238 |I| HLE.OsThread.22 ServicePrepo ProcessPlayReport: 
+PlayReport log:
+ Kind: Normal
+ Pid: 109
+ ApplicationVersion: 0
+ UserId: 00000000000000010000000000000000
+ Room: erepo_region 
+ Report: {
+    "Region": 1,
+    "Language": 1,
+    "StandardTimeName": "UTC",
+    "UtcOffsetSeconds": 0,
+    "system_report_tag": 2759414308
+}
+
+00:00:52.244 |I| HLE.OsThread.22 ServicePrepo ProcessPlayReport: 
+PlayReport log:
+ Kind: Normal
+ Pid: 109
+ ApplicationVersion: 0
+ UserId: 00000000000000010000000000000000
+ Room: erepo_time 
+ Report: {
+    "ActiveTime": 39,
+    "UpdatedTime": 0,
+    "system_report_tag": 2759414308
+}
+
+00:00:52.245 |I| HLE.OsThread.22 ServicePrepo ProcessPlayReport: 
+PlayReport log:
+ Kind: Normal
+ Pid: 109
+ ApplicationVersion: 0
+ UserId: 00000000000000010000000000000000
+ Room: erepo_playstyle 
+ Report: {
+    "system_report_tag": 2759414308
+}
+
+00:00:52.248 |I| HLE.OsThread.22 ServicePrepo ProcessPlayReport: 
+PlayReport log:
+ Kind: Normal
+ Pid: 109
+ ApplicationVersion: 0
+ UserId: 00000000000000010000000000000000
+ Room: erepo_network_status 
+ Report: {
+    "NetworkInterface": {
+        "TypeCode": 64,
+        "Value": "0x00000000000000000000000000000000"
+    },
+    "LinkLevel": {
+        "TypeCode": 65,
+        "Value": "0x00"
+    },
+    "FrequencyBand": {
+        "TypeCode": 66,
+        "Value": "0x00000000000000000000"
+    },
+    "system_report_tag": 2759414308
+}
+
+00:00:52.383 |W| {Nv} ServiceNv Wait: GPU processing thread is too slow, waiting on CPU...
+00:00:52.665 |I| HLE.OsThread.22 ServicePrepo ProcessPlayReport: 
+PlayReport log:
+ Kind: Normal
+ Pid: 109
+ ApplicationVersion: 0
+ UserId: 00000000000000010000000000000000
+ Room: erepo_active_beacon 
+ Report: {
+    "IntervalTime": 0,
+    "UpdatedTime": 0,
+    "system_report_tag": 0
+}
+
+00:00:52.925 |S| {Common} ServiceAcc CheckAvailability: Stubbed. 
+00:00:52.927 |S| {Common} ServiceAcc GetAccountId: Stubbed. {NetworkServiceAccountId: 51966}
+00:00:54.877 |S| {Hid} ServiceHid SetSupportedNpadStyleSet: Stubbed. {pid: 109 ; appletResourceUserId: 1 ; type: ProController, Handheld, JoyconPair}
+00:00:54.887 |S| {Hid} ServiceHid DisconnectNpad: Stubbed. {appletResourceUserId: 4294967296 ; npadIdType: Player2}
+00:00:54.889 |S| {Hid} ServiceHid DisconnectNpad: Stubbed. {appletResourceUserId: 4294967296 ; npadIdType: Player3}
+00:00:54.889 |S| {Hid} ServiceHid DisconnectNpad: Stubbed. {appletResourceUserId: 4294967296 ; npadIdType: Player4}
+00:00:54.891 |S| {Hid} ServiceHid SetGyroscopeZeroDriftMode: Stubbed. {appletResourceUserId: 1 ; sixAxisSensorHandle: 131075 ; _gyroscopeZeroDriftMode: Tight}
+00:00:55.529 |S| {Common} ServiceNifm CreateRequest: Stubbed. {version: 2}
+00:00:56.122 |S| {Common} ServiceNifm SetConnectionConfirmationOption: Stubbed. 
+00:00:56.138 |S| {Common} ServiceNifm Submit: Stubbed. 
+00:00:56.150 |S| {Common} ServiceNifm GetRequestState: Stubbed. 
+00:00:56.158 |S| {Common} ServiceNifm GetResult: Stubbed. 
+00:00:56.288 |I| HLE.OsThread.22 ServicePrepo ProcessPlayReport: 
+PlayReport log:
+ Kind: Normal
+ Pid: 109
+ ApplicationVersion: 0
+ UserId: 00000000000000010000000000000000
+ Room: erepo_network_error 
+ Report: {
+    "SectionId": {
+        "TypeCode": 0,
+        "Value": "0x0000000000000000"
+    },
+    "SectionType": 0,
+    "SectionTime_sec": 24,
+    "NetworkType": 1,
+    "P2PSessionId": {
+        "TypeCode": 0,
+        "Value": "0x0000000000000000"
+    },
+    "P2PSessionClock_sec": -1,
+    "ErrorFrom": "Nifm",
+    "ErrorLevel": "NeedSpecialHandling",
+    "CommonError": "ReadyNetworkFailed",
+    "IsNeedDisplayViewer": False,
+    "ApplicationErrorId": 0,
+    "system_report_tag": 0
+}
+
+00:01:02.069 |I| HLE.OsThread.22 ServicePrepo ProcessPlayReport: 
+PlayReport log:
+ Kind: Normal
+ Pid: 109
+ ApplicationVersion: 0
+ UserId: 00000000000000010000000000000000
+ Room: boot 
+ Report: {
+    "common": {
+        "app_version": "11.2.0",
+        "npln_id": "",
+        "boot_count": 11,
+        "boot_identify": 2103893991,
+        "steady_clock": 60,
+        "steady_clock_source": "84323302-baea-0816-c18b-ce028732a036",
+        "report_count": 1,
+        "ctrl_style": 1
+    },
+    "is_boot": True,
+    "mission_clear_stage_num": 0,
+    "mission_crater_ikura_num": 0,
+    "mission_alterna_ikura_num": 0,
+    "mission_is_clear_last_boss_stage": False,
+    "last_play_device_id": "",
+    "last_play_timestamp": 0,
+    "last_play_coordinates": {
+        "model_type": 0,
+        "weapon_id": -1,
+        "gear_head_id": -1,
+        "gear_head_variation_id": 0,
+        "gear_clothes_id": -1,
+        "gear_clothes_variation_id": 0,
+        "gear_shoes_id": -1,
+        "gear_shoes_variation_id": 0,
+        "hair_id": 0,
+        "bottom_id": 0,
+        "bottom_variation": 0,
+        "skin_color": 0,
+        "eye_color": 0,
+        "eyebrow": 0,
+        "coop_skin": 0,
+        "win_emote": -1
+    },
+    "last_play_control_option_handheld": {
+        "camera_speed_stick_digital": 8,
+        "camera_speed_gyro_digital": 8,
+        "is_enable_gyro": True,
+        "is_reverse_ud": False,
+        "is_reverse_lr": False
+    },
+    "last_play_control_option_other": {
+        "camera_speed_stick_digital": 8,
+        "camera_speed_gyro_digital": 8,
+        "is_enable_gyro": True,
+        "is_reverse_ud": False,
+        "is_reverse_lr": False
+    },
+    "player_rank": 0,
+    "player_rank_exp": 0,
+    "money": 0,
+    "shell": 0,
+    "use_boost": {
+        "type": -1,
+        "count": 0,
+        "gear_skill": -1
+    },
+    "is_transferred_from_blitz": False,
+    "save_count": 55,
+    "weapon_license": 0,
+    "gold_weapon_license": 0,
+    "coop": {
+        "ikura_num": 0,
+        "golden_ikura_num": 0,
+        "help_count": 0,
+        "last_begin_time": 0,
+        "bronze_uroko_num": 0,
+        "silver_uroko_num": 0,
+        "gold_uroko_num": 0,
+        "bronze_uroko_spend_num": 0,
+        "silver_uroko_spend_num": 0,
+        "gold_uroko_spend_num": 0,
+        "is_clear_difficulty_max": False,
+        "is_clear_difficulty_max_triple_boss": False
+    },
+    "lobby_versus": {
+        "is_watched_first_enter": False,
+        "is_watched_after_first_battle": False,
+        "is_watched_introduce_weapon_shop": False,
+        "is_watched_introduce_shop": False,
+        "is_watched_unlock_bankara_match": False,
+        "is_watched_unlock_xmatch": False,
+        "is_xmatch_available": False,
+        "is_watched_introduce_name_plate": False,
+        "is_done_first_kiosk": False,
+        "is_watched_first_locker": False,
+        "is_watched_locker_level_up2": False,
+        "is_watched_locker_level_up3": False,
+        "is_upload_locker_info": False,
+        "is_done_first_private_match_alias": False,
+        "locker_preset_weapon_id": -1,
+        "locker_preset_shoes_id": -1,
+        "locker_preset_index": 0,
+        "is_done_first_replay_notification": False
+    },
+    "lobby_coop": {
+        "is_done_tutorial_blitz": False,
+        "is_done_tutorial00": False,
+        "is_done_tutorial01": False,
+        "is_done_big_run_tutorial": False,
+        "is_downloaded_record_once": False,
+        "last_cash_exchange_item_num": 0,
+        "is_acquired_all_stage_gold_badge": False,
+        "is_acquired_clear_difficulty_max_triple_boss": False
+    },
+    "user_name": "",
+    "identifier": "",
+    "change_name_timestamp": 0,
+    "fest": {
+        "fest_id": "",
+        "is_watched_announce": False,
+        "is_watched_being_held": False,
+        "is_watched_intermediate_result": False,
+        "is_watched_waiting_for_result": False,
+        "is_watched_result": False,
+        "vote_team": -1,
+        "fest_rank": 0,
+        "fest_point": 0,
+        "conch_shell": 0,
+        "conch_shell_sum": 0,
+        "cntrbt_sum_regular": 0,
+        "versus_count_regular": 0,
+        "cntrbt_sum_challenge": 0,
+        "versus_count_challenge": 0,
+        "highest_fest_power": 0,
+        "versus_count_tri_col": 0,
+        "cntrbt_sum_tri_col": 0,
+        "fes_win_proof": 0,
+        "is_done_vendor_explain_fest_t": False
+    },
+    "shop": {
+        "is_visited_weapon_shop": False,
+        "is_visited_head_shop": False,
+        "is_visited_clothes_shop": False,
+        "is_visited_shoes_shop": False,
+        "is_visited_goods_shop": False,
+        "player_rank_visited_head_shop": 0,
+        "player_rank_visited_clothes_shop": 0,
+        "player_rank_visited_shoes_shop": 0,
+        "player_rank_visited_goods_shop": 0,
+        "is_read_weapon_licence_exp": False,
+        "is_read_gold_weapon_licence_exp": False,
+        "is_read_rarity_up_and_replace_exp_in_head_shop": False,
+        "is_read_rarity_up_and_replace_exp_in_clothes_shop": False,
+        "is_read_rarity_up_and_replace_exp_in_shoes_shop": False,
+        "total_payment_in_head_shop": 0,
+        "total_payment_in_clothes_shop": 0,
+        "total_payment_in_shoes_shop": 0,
+        "total_payment_in_goods_shop": 0,
+        "player_rank_for_lineup_update": 0,
+        "lineup_update_timestamp": 0,
+        "is_visited_weapon_shop_fsodr": False,
+        "is_visited_head_shop_fsodr": False,
+        "is_visited_clothes_shop_fsodr": False,
+        "is_visited_shoes_shop_fsodr": False,
+        "player_rank_visited_head_shop_fsodr": 0,
+        "player_rank_visited_clothes_shop_fsodr": 0,
+        "player_rank_visited_shoes_shop_fsodr": 0,
+        "is_read_weapon_licence_exp_fsodr": False,
+        "is_read_gold_weapon_licence_exp_fsodr": False,
+        "is_read_rarity_up_and_replace_exp_in_head_shop_fsodr": False,
+        "is_read_rarity_up_and_replace_exp_in_clothes_shop_fsodr": False,
+        "is_read_rarity_up_and_replace_exp_in_shoes_shop_fsodr": False,
+        "total_payment_in_head_shop_fsodr": 0,
+        "total_payment_in_clothes_shop_fsodr": 0,
+        "total_payment_in_shoes_shop_fsodr": 0,
+        "release_comment_for_abxy": 0,
+        "is_read_weapon_personel_change": False,
+        "is_visited_weapon_shop_sdodr": False,
+        "is_visited_head_shop_sdodr": False,
+        "is_visited_clothes_shop_sdodr": False,
+        "is_visited_shoes_shop_sdodr": False,
+        "player_rank_visited_head_shop_sdodr": 0,
+        "player_rank_visited_clothes_shop_sdodr": 0,
+        "player_rank_visited_shoes_shop_sdodr": 0,
+        "is_read_weapon_licence_exp_sdodr": False,
+        "is_read_gold_weapon_licence_exp_sdodr": False,
+        "is_read_rarity_up_and_replace_exp_in_head_shop_sdodr": False,
+        "is_read_rarity_up_and_replace_exp_in_clothes_shop_sdodr": False,
+        "is_read_rarity_up_and_replace_exp_in_shoes_shop_sdodr": False,
+        "total_payment_in_head_shop_sdodr": 0,
+        "total_payment_in_clothes_shop_sdodr": 0,
+        "total_payment_in_shoes_shop_sdodr": 0
+    },
+    "fest_region": 0,
+    "xranking_region": 0,
+    "season": {
+        "current_season_id": -1,
+        "xleaderboard_id": -1,
+        "catalog_point": 0,
+        "catalog_level": 0,
+        "reward_accept_catalog_level": 0,
+        "catalog_book_complete_num": 0,
+        "daily_bonus_timestamp": 0,
+        "start_time": 0,
+        "end_time": 0,
+        "mystery_box_get_inside_flag": 0,
+        "is_participated_bankara": False,
+        "xranking_region": 0,
+        "highest_xpower_var": 0,
+        "highest_xpower_vlf": 0,
+        "highest_xpower_vgl": 0,
+        "highest_xpower_vcl": 0,
+        "is_acquired_xranking_reward": False,
+        "xrank_badge_level": -1,
+        "is_xranking_closed": False,
+        "is_watched_season_end_bonus_news": False,
+        "xleaderboard_checked_update_time": 0
+    },
+    "last_season": {
+        "current_season_id": -1,
+        "xleaderboard_id": -1,
+        "catalog_point": 0,
+        "catalog_level": 0,
+        "reward_accept_catalog_level": 0,
+        "catalog_book_complete_num": 0,
+        "daily_bonus_timestamp": 0,
+        "start_time": 0,
+        "end_time": 0,
+        "mystery_box_get_inside_flag": 0,
+        "is_participated_bankara": False,
+        "xranking_region": 0,
+        "highest_xpower_var": 0,
+        "highest_xpower_vlf": 0,
+        "highest_xpower_vgl": 0,
+        "highest_xpower_vcl": 0,
+        "is_acquired_xranking_reward": False,
+        "xrank_badge_level": -1,
+        "is_xranking_closed": False,
+        "is_watched_season_end_bonus_news": False,
+        "xleaderboard_checked_update_time": 0
+    },
+    "channel_name": "",
+    "last_play_name_plate": {
+        "badge1": 0,
+        "badge2": 0,
+        "badge3": 0,
+        "background": 1
+    },
+    "game_record_history": {
+        "highest_udemae": 0,
+        "highest_udemae_update_timestamp": 0
+    },
+    "vs_win_num_for_amiibo": 0,
+    "change_fest_region_timestamp": 0,
+    "version": 721408,
+    "vendor": {
+        "order_num": 0,
+        "order_num_fsodr": 0,
+        "last_order_receive_time_utc": 0,
+        "is_done_first_sdodr": False,
+        "is_done_first_sand_spiky": False,
+        "is_done_first_sand_downey": False
+    },
+    "lot": {
+        "is_done_first_explain": False,
+        "is_done_first_explain_fest": False,
+        "coin": 0,
+        "last_time_utc": 0,
+        "spend_money_sum": 0
+    },
+    "random_food_ticket_num": 0,
+    "random_drink_ticket_num": 0,
+    "kiosk_order_num": 0,
+    "random_byname_num": 0,
+    "random_mountain_climb": 3811537008,
+    "system_report_tag": 2175206328
+}
+
+00:01:02.081 |I| HLE.OsThread.22 ServicePrepo ProcessPlayReport: 
+PlayReport log:
+ Kind: Normal
+ Pid: 109
+ ApplicationVersion: 0
+ UserId: 00000000000000010000000000000000
+ Room: boot1 
+ Report: {
+    "common": {
+        "app_version": "11.2.0",
+        "npln_id": "",
+        "boot_count": 11,
+        "boot_identify": 2103893991,
+        "steady_clock": 60,
+        "steady_clock_source": "84323302-baea-0816-c18b-ce028732a036",
+        "report_count": 2,
+        "ctrl_style": 1
+    },
+    "is_boot": True,
+    "user_screening": {
+        "report_left_count": 10,
+        "valid_match_count": 0,
+        "last_report_date": 0,
+        "block_player_num": 0
+    },
+    "mini_game": {
+        "card_piece_num": 0,
+        "nawabattler_point": 0,
+        "card_num": 0,
+        "card_sleeve": 1,
+        "common_grade1num": 0,
+        "common_grade2num": 0,
+        "common_grade3num": 0,
+        "rare_grade1num": 0,
+        "rare_grade2num": 0,
+        "rare_grade3num": 0,
+        "fresh_grade1num": 0,
+        "fresh_grade2num": 0,
+        "fresh_grade3num": 0,
+        "battle_ai1win": 0,
+        "battle_ai2win": 0,
+        "battle_ai3win": 0
+    },
+    "event": {
+        "gold_trophy_num": 0,
+        "silver_trophy_num": 0,
+        "bronze_trophy_num": 0,
+        "none_trophy_num": 0
+    },
+    "bankara": {
+        "gold_trophy_num": 0,
+        "silver_trophy_num": 0,
+        "bronze_trophy_num": 0,
+        "none_trophy_num": 0
+    },
+    "tutorial_clear_time": 109,
+    "has_dlc": True,
+    "city": 0,
+    "system_report_tag": 2175206328
+}
+
+00:01:02.093 |I| HLE.OsThread.22 ServicePrepo ProcessPlayReport: 
+PlayReport log:
+ Kind: Normal
+ Pid: 109
+ ApplicationVersion: 0
+ UserId: 00000000000000010000000000000000
+ Room: boot_ch 
+ Report: {
+    "common": {
+        "app_version": "11.2.0",
+        "npln_id": "",
+        "boot_count": 11,
+        "boot_identify": 2103893991,
+        "steady_clock": 60,
+        "steady_clock_source": "84323302-baea-0816-c18b-ce028732a036",
+        "report_count": 3,
+        "ctrl_style": 1
+    },
+    "ch0": 479161430,
+    "ch1": 2609533097,
+    "ch2": 179885762,
+    "ch3": 2754309473,
+    "ch4": 1880698950,
+    "ch5": 240169804,
+    "system_report_tag": 2175206328
+}
+
+00:01:02.525 |S| {Common} ServiceAcc CheckAvailability: Stubbed. 
+00:01:02.525 |S| {Common} ServiceAcc GetAccountId: Stubbed. {NetworkServiceAccountId: 51966}
+00:01:02.593 |S| {Common} ServicePctl CheckFreeCommunicationPermission: Stubbed. 
+00:01:08.954 |W| <SceneLowPriority> Cpu Allocate: JIT Cache of size 256 MB exhausted, creating new Cache Region (512 MB Total Allocation).
+00:01:11.256 |S| {Common} ServicePctl IsFreeCommunicationAvailable: Stubbed. 
+00:01:11.279 |S| {Common} ServicePctl IsFreeCommunicationAvailable: Stubbed. 
+00:01:30.694 |S| {Common} ServicePctl IsFreeCommunicationAvailable: Stubbed. 
+00:01:39.659 |S| {Hid} ServiceHid DisconnectNpad: Stubbed. {appletResourceUserId: 4294967296 ; npadIdType: Player2}
+00:01:39.659 |S| {Hid} ServiceHid DisconnectNpad: Stubbed. {appletResourceUserId: 4294967296 ; npadIdType: Player3}
+00:01:39.659 |S| {Hid} ServiceHid DisconnectNpad: Stubbed. {appletResourceUserId: 4294967296 ; npadIdType: Player4}
+00:01:45.039 |W| {Nv} ServiceNv Wait: GPU processing thread is too slow, waiting on CPU...
+00:01:46.044 |E| {Nv} Gpu WaitOnSyncpoint: Wait on syncpoint 1 for threshold 2056 took more than 1000ms, resuming execution...
+00:01:48.099 |W| {Nv} ServiceNv Wait: GPU processing thread is too slow, waiting on CPU...
+00:01:49.099 |E| {Nv} Gpu WaitOnSyncpoint: Wait on syncpoint 1 for threshold 2059 took more than 1000ms, resuming execution...
+00:01:55.903 |E| CPU.BackgroundTranslatorThread.1 Application : Unhandled exception caught: System.OutOfMemoryException: Exception of type 'System.OutOfMemoryException' was thrown.
+   at System.Collections.Generic.List`1.set_Capacity(Int32 value)
+   at System.Collections.Generic.List`1.AddWithResize(T item)
+   at ARMeilleure.CodeGen.RegisterAllocators.LinearScanAllocator.NumberLocals(ControlFlowGraph cfg, Int32 registersCount) in /workspace/projects/Ryubing/src/ARMeilleure/CodeGen/RegisterAllocators/LinearScanAllocator.cs:line 832
+   at ARMeilleure.CodeGen.RegisterAllocators.LinearScanAllocator.RunPass(ControlFlowGraph cfg, StackAllocator stackAlloc, RegisterMasks regMasks) in /workspace/projects/Ryubing/src/ARMeilleure/CodeGen/RegisterAllocators/LinearScanAllocator.cs:line 116
+   at ARMeilleure.CodeGen.X86.CodeGenerator.Generate(CompilerContext cctx) in /workspace/projects/Ryubing/src/ARMeilleure/CodeGen/X86/CodeGenerator.cs:line 152
+   at ARMeilleure.Translation.Compiler.Compile(ControlFlowGraph cfg, OperandType[] argTypes, OperandType retType, CompilerOptions options, Architecture target) in /workspace/projects/Ryubing/src/ARMeilleure/Translation/Compiler.cs:line 56
+   at ARMeilleure.Translation.Translator.Translate(UInt64 address, ExecutionMode mode, Boolean highCq, Boolean singleStep, Boolean pptcTranslation) in /workspace/projects/Ryubing/src/ARMeilleure/Translation/Translator.cs:line 304
+   at ARMeilleure.Translation.Translator.BackgroundTranslate() in /workspace/projects/Ryubing/src/ARMeilleure/Translation/Translator.cs:line 324
+   at System.Threading.Thread.StartHelper.Callback(Object state)
+   at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
+00:01:55.903 |E| <BaseProcExecutor1> Application : Unhandled exception caught: System.OutOfMemoryException: Exception of type 'System.OutOfMemoryException' was thrown.
+   at System.Array.Resize[T](T[]& array, Int32 newSize)
+   at ARMeilleure.CodeGen.RegisterAllocators.HybridAllocator.RunPass(ControlFlowGraph cfg, StackAllocator stackAlloc, RegisterMasks regMasks) in /workspace/projects/Ryubing/src/ARMeilleure/CodeGen/RegisterAllocators/HybridAllocator.cs:line 172
+   at ARMeilleure.CodeGen.X86.CodeGenerator.Generate(CompilerContext cctx) in /workspace/projects/Ryubing/src/ARMeilleure/CodeGen/X86/CodeGenerator.cs:line 152
+   at ARMeilleure.Translation.Compiler.Compile(ControlFlowGraph cfg, OperandType[] argTypes, OperandType retType, CompilerOptions options, Architecture target) in /workspace/projects/Ryubing/src/ARMeilleure/Translation/Compiler.cs:line 56
+   at ARMeilleure.Translation.Translator.Translate(UInt64 address, ExecutionMode mode, Boolean highCq, Boolean singleStep, Boolean pptcTranslation) in /workspace/projects/Ryubing/src/ARMeilleure/Translation/Translator.cs:line 304
+   at ARMeilleure.Translation.Translator.GetOrTranslate(UInt64 address, ExecutionMode mode) in /workspace/projects/Ryubing/src/ARMeilleure/Translation/Translator.cs:line 219
+   at ARMeilleure.Instructions.NativeInterface.GetFunctionAddress(UInt64 address) in /workspace/projects/Ryubing/src/ARMeilleure/Instructions/NativeInterface.cs:line 186
+   at ARMeilleure.Translation.Translator.Execute(ExecutionContext context, UInt64 address) in /workspace/projects/Ryubing/src/ARMeilleure/Translation/Translator.cs:line 146
+   at Ryujinx.HLE.HOS.Kernel.Threading.KThread.ThreadStart() in /workspace/projects/Ryubing/src/Ryujinx.HLE/HOS/Kernel/Threading/KThread.cs:line 1308
+   at System.Threading.Thread.StartHelper.Callback(Object state)
+   at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
+00:01:55.903 |E| CPU.BackgroundTranslatorThread.2 Application : Unhandled exception caught: System.OutOfMemoryException: Exception of type 'System.OutOfMemoryException' was thrown.
+   at System.Collections.Generic.Dictionary`2.Resize(Int32 newSize, Boolean forceNewHashCodes)
+   at System.Collections.Generic.Dictionary`2.TryInsert(TKey key, TValue value, InsertionBehavior behavior)
+   at ARMeilleure.CodeGen.RegisterAllocators.LinearScanAllocator.<InsertSplitCopies>g__GetCopyResolver|19_0(Int32 position, <>c__DisplayClass19_0&) in /workspace/projects/Ryubing/src/ARMeilleure/CodeGen/RegisterAllocators/LinearScanAllocator.cs:line 585
+   at ARMeilleure.CodeGen.RegisterAllocators.LinearScanAllocator.InsertSplitCopies() in /workspace/projects/Ryubing/src/ARMeilleure/CodeGen/RegisterAllocators/LinearScanAllocator.cs:line 601
+   at ARMeilleure.CodeGen.RegisterAllocators.LinearScanAllocator.RunPass(ControlFlowGraph cfg, StackAllocator stackAlloc, RegisterMasks regMasks) in /workspace/projects/Ryubing/src/ARMeilleure/CodeGen/RegisterAllocators/LinearScanAllocator.cs:line 161
+   at ARMeilleure.CodeGen.X86.CodeGenerator.Generate(CompilerContext cctx) in /workspace/projects/Ryubing/src/ARMeilleure/CodeGen/X86/CodeGenerator.cs:line 152
+   at ARMeilleure.Translation.Compiler.Compile(ControlFlowGraph cfg, OperandType[] argTypes, OperandType retType, CompilerOptions options, Architecture target) in /workspace/projects/Ryubing/src/ARMeilleure/Translation/Compiler.cs:line 56
+   at ARMeilleure.Translation.Translator.Translate(UInt64 address, ExecutionMode mode, Boolean highCq, Boolean singleStep, Boolean pptcTranslation) in /workspace/projects/Ryubing/src/ARMeilleure/Translation/Translator.cs:line 304
+   at ARMeilleure.Translation.Translator.BackgroundTranslate() in /workspace/projects/Ryubing/src/ARMeilleure/Translation/Translator.cs:line 324
+   at System.Threading.Thread.StartHelper.Callback(Object state)
+   at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
