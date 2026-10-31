@@ -23,14 +23,240 @@
     "host": 0,
     "relr": 15013
    },
-   "functions": 52851,
-   "emitted": 0,
-   "text_bytes_in_fns": 0,
-   "gap_mnemonics": [],
-   "gap_count": 0,
-   "gap_whys": [],
-   "gen_files": 0,
-   "gen_bytes": 0
+   "functions": 62709,
+   "emitted": 62709,
+   "text_bytes_in_fns": 6597052,
+   "gap_mnemonics": [
+    "addv",
+    "aesd",
+    "aese",
+    "aesimc",
+    "bif",
+    "bsl",
+    "cmeq",
+    "cmhi",
+    "cmlt",
+    "cmtst",
+    "cnt",
+    "dup",
+    "ext",
+    "fabd",
+    "fabs",
+    "fadd",
+    "fcmgt",
+    "fcvtzs",
+    "fmaxp",
+    "fmla",
+    "fmls",
+    "fmov",
+    "fmul",
+    "fneg",
+    "fsub",
+    "ld1",
+    "ld1r",
+    "ld2",
+    "ld3",
+    "ld3r",
+    "ld4",
+    "mvni",
+    "rev16",
+    "rev32",
+    "rev64",
+    "saddlp",
+    "scvtf",
+    "shadd",
+    "shl",
+    "shrn",
+    "smax",
+    "smin",
+    "smlal",
+    "smull2",
+    "sqadd",
+    "sqdmulh",
+    "sqrdmulh",
+    "sqrshrn",
+    "sqshrn",
+    "sqsub",
+    "sqxtn",
+    "sshll",
+    "st1",
+    "st2",
+    "stg",
+    "tbl",
+    "umaxv",
+    "umnegl",
+    "uqxtn",
+    "ushl",
+    "ushll",
+    "uzp1",
+    "zip1",
+    "zip2"
+   ],
+   "gap_count": 702,
+   "gap_whys": [
+    [
+     "dup: simd 'dup'",
+     99
+    ],
+    [
+     "ld1: simd ldst",
+     83
+    ],
+    [
+     "ld2: simd ldst",
+     72
+    ],
+    [
+     "rev64: simd 'rev64'",
+     62
+    ],
+    [
+     "ld1r: simd ldst",
+     51
+    ],
+    [
+     "shrn: unmapped mnemonic 'shrn'",
+     27
+    ],
+    [
+     "cmeq: simd 'cmeq'",
+     23
+    ],
+    [
+     "ext: simd 'ext'",
+     21
+    ],
+    [
+     "fmla: unmapped mnemonic 'fmla'",
+     17
+    ],
+    [
+     "umaxv: unmapped mnemonic 'umaxv'",
+     16
+    ],
+    [
+     "sqadd: simd 'sqadd'",
+     16
+    ],
+    [
+     "rev32: simd 'rev32'",
+     14
+    ],
+    [
+     "fmul: fp vector 'fmul'",
+     13
+    ],
+    [
+     "uzp1: simd 'uzp1'",
+     10
+    ],
+    [
+     "ld4: simd ldst",
+     9
+    ],
+    [
+     "fneg: fp vector 'fneg'",
+     9
+    ],
+    [
+     "st1: simd ldst",
+     9
+    ],
+    [
+     "aese: unmapped mnemonic 'aese'",
+     8
+    ],
+    [
+     "mvni: unmapped mnemonic 'mvni'",
+     8
+    ],
+    [
+     "sqdmulh: unmapped mnemonic 'sqdmulh'",
+     8
+    ],
+    [
+     "fmov: fp vector 'fmov'",
+     7
+    ],
+    [
+     "scvtf: fp vector 'scvtf'",
+     7
+    ],
+    [
+     "sqxtn: simd 'sqxtn'",
+     7
+    ],
+    [
+     "sqrshrn: unmapped mnemonic 'sqrshrn'",
+     6
+    ],
+    [
+     "aesd: unmapped mnemonic 'aesd'",
+     5
+    ],
+    [
+     "ushll: unmapped mnemonic 'ushll'",
+     5
+    ],
+    [
+     "cnt: simd 'cnt'",
+     5
+    ],
+    [
+     "cmlt: unmapped mnemonic 'cmlt'",
+     5
+    ],
+    [
+     "fadd: fp vector 'fadd'",
+     5
+    ],
+    [
+     "sqrdmulh: unmapped mnemonic 'sqrdmulh'",
+     5
+    ],
+    [
+     "zip1: simd 'zip1'",
+     4
+    ],
+    [
+     "sqshrn: unmapped mnemonic 'sqshrn'",
+     4
+    ],
+    [
+     "smlal: unmapped mnemonic 'smlal'",
+     4
+    ],
+    [
+     "aesimc: unmapped mnemonic 'aesimc'",
+     3
+    ],
+    [
+     "tbl: simd 'tbl'",
+     3
+    ],
+    [
+     "rev16: simd 'rev16'",
+     3
+    ],
+    [
+     "addv: unmapped mnemonic 'addv'",
+     3
+    ],
+    [
+     "fsub: fp vector 'fsub'",
+     3
+    ],
+    [
+     "shadd: unmapped mnemonic 'shadd'",
+     3
+    ],
+    [
+     "st2: simd ldst",
+     3
+    ]
+   ],
+   "gen_files": 11,
+   "gen_bytes": 120139243
   },
   "main": {
    "relocs": {
@@ -39,14 +265,243 @@
     "host": 20,
     "relr": 528689
    },
-   "functions": 307941,
-   "emitted": 0,
-   "text_bytes_in_fns": 0,
-   "gap_mnemonics": [],
-   "gap_count": 0,
-   "gap_whys": [],
-   "gen_files": 0,
-   "gen_bytes": 0
+   "functions": 348626,
+   "emitted": 348626,
+   "text_bytes_in_fns": 81981260,
+   "gap_mnemonics": [
+    "addp",
+    "addv",
+    "bic",
+    "bif",
+    "bit",
+    "bsl",
+    "clz",
+    "cmeq",
+    "cmgt",
+    "cmlt",
+    "cnt",
+    "dup",
+    "ext",
+    "fabd",
+    "fabs",
+    "fadd",
+    "faddp",
+    "fcmeq",
+    "fcmge",
+    "fcmgt",
+    "fcmlt",
+    "fdiv",
+    "fmax",
+    "fmaxnmv",
+    "fmaxp",
+    "fmin",
+    "fminnmv",
+    "fminp",
+    "fmla",
+    "fmls",
+    "fmov",
+    "fmul",
+    "fneg",
+    "frsqrts",
+    "fsqrt",
+    "fsub",
+    "ld1",
+    "ld1r",
+    "ld2",
+    "ld4",
+    "ldaxp",
+    "ldr",
+    "mvni",
+    "orr",
+    "rev64",
+    "scvtf",
+    "shl",
+    "shll",
+    "smov",
+    "sqincd",
+    "sshll",
+    "sshr",
+    "st1",
+    "st2",
+    "tbl",
+    "uaddw",
+    "umov",
+    "umull2",
+    "ushl",
+    "ushll",
+    "ushll2",
+    "ushr",
+    "uzp1",
+    "uzp2",
+    "xtn",
+    "zip1",
+    "zip2"
+   ],
+   "gap_count": 7189,
+   "gap_whys": [
+    [
+     "fsub: fp vector 'fsub'",
+     2315
+    ],
+    [
+     "dup: simd 'dup'",
+     1083
+    ],
+    [
+     "fmul: fp vector 'fmul'",
+     1073
+    ],
+    [
+     "fadd: fp vector 'fadd'",
+     493
+    ],
+    [
+     "ext: simd 'ext'",
+     470
+    ],
+    [
+     "ld1: simd ldst",
+     282
+    ],
+    [
+     "bif: unmapped mnemonic 'bif'",
+     207
+    ],
+    [
+     "ld1r: simd ldst",
+     166
+    ],
+    [
+     "fneg: fp vector 'fneg'",
+     142
+    ],
+    [
+     "fcmge: unmapped mnemonic 'fcmge'",
+     102
+    ],
+    [
+     "zip1: simd 'zip1'",
+     91
+    ],
+    [
+     "cnt: simd 'cnt'",
+     70
+    ],
+    [
+     "st1: simd ldst",
+     61
+    ],
+    [
+     "fmla: unmapped mnemonic 'fmla'",
+     54
+    ],
+    [
+     "fcmeq: unmapped mnemonic 'fcmeq'",
+     52
+    ],
+    [
+     "tbl: simd 'tbl'",
+     44
+    ],
+    [
+     "fmov: fp vector 'fmov'",
+     35
+    ],
+    [
+     "faddp: unmapped mnemonic 'faddp'",
+     29
+    ],
+    [
+     "ushll: unmapped mnemonic 'ushll'",
+     28
+    ],
+    [
+     "fmax: fp vector 'fmax'",
+     26
+    ],
+    [
+     "fcmgt: unmapped mnemonic 'fcmgt'",
+     25
+    ],
+    [
+     "fmin: fp vector 'fmin'",
+     24
+    ],
+    [
+     "fdiv: fp vector 'fdiv'",
+     24
+    ],
+    [
+     "zip2: simd 'zip2'",
+     23
+    ],
+    [
+     "cmeq: simd 'cmeq'",
+     20
+    ],
+    [
+     "fabs: fp vector 'fabs'",
+     19
+    ],
+    [
+     "rev64: simd 'rev64'",
+     17
+    ],
+    [
+     "fmaxp: fp vector 'fmaxp'",
+     15
+    ],
+    [
+     "ld2: simd ldst",
+     14
+    ],
+    [
+     "bsl: unmapped mnemonic 'bsl'",
+     13
+    ],
+    [
+     "fabd: simd 'fabd'",
+     12
+    ],
+    [
+     "uzp2: simd 'uzp2'",
+     11
+    ],
+    [
+     "cmlt: unmapped mnemonic 'cmlt'",
+     10
+    ],
+    [
+     "ushl: simd 'ushl'",
+     10
+    ],
+    [
+     "bit: unmapped mnemonic 'bit'",
+     10
+    ],
+    [
+     "fmaxnmv: unmapped mnemonic 'fmaxnmv'",
+     8
+    ],
+    [
+     "scvtf: fp vector 'scvtf'",
+     8
+    ],
+    [
+     "uzp1: simd 'uzp1'",
+     7
+    ],
+    [
+     "ld4: simd ldst",
+     7
+    ],
+    [
+     "fsqrt: fp vector 'fsqrt'",
+     7
+    ]
+   ],
+   "gen_files": 59,
+   "gen_bytes": 1332606279
   }
  },
  "load_base": {
@@ -71,5 +526,5 @@
   "glslcInitialize",
   "glslcSetAllocator"
  ],
- "meta_c": 23940828
+ "meta_c": 27133461
 }

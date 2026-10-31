@@ -442,9 +442,21 @@ def main():
         njt = scan_jump_tables(mod)
         extra |= njt
         extra |= {int(tg) - mod["base"] for tg in all_targets if lo <= tg < hi}
+        # Cross-range branch targets from tools/scan_crossers.py (fixpoint):
+        # a direct branch that crosses a function boundary into an address
+        # that is not a start dispatches to nothing and STOPs the run
+        # (observed: b.ne ecccc24 -> ecccc48, split by a jump-table seed).
+        # Seeding those targets keeps every cross-boundary branch resolvable.
+        ncx = 0
+        cxp = os.path.join(HERE, f"crossers_{mod['name']}.json")
+        if os.path.exists(cxp):
+            with open(cxp) as cf:
+                cx = {int(v) for v in json.load(cf)}
+            extra |= cx
+            ncx = len(cx)
         mod["extra_starts"] = extra
         print(f"[gen] {mod['name']}: {len(plt[mod['name']])} PLT stubs, "
-              f"{len(njt)} jump-table targets, "
+              f"{len(njt)} jump-table targets, {ncx} cross-range targets, "
               f"{len(extra)} extra starts total")
 
     # ---- emission ----
