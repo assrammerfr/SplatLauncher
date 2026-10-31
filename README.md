@@ -1,11 +1,10 @@
-# SplatLauncher
-A Launcher For Splatoon 2/3. Must Obtain Your Own Files.
+# SplatLaunch (frontend only)
 
 Library browser, profiles, and save backup for Splatoon 2 and 3 folders you extracted from your own consoles.
 No game runtime is included. The "Launch" button runs whatever executable you set in the runtime field.
 
 ## Setup (Windows)
-1. Copy this folder to `D:\splatlauncher`
+1. Copy this folder to `D:\splatlauncher\`
 2. `pip install -r requirements.txt`
 3. `python app.py`
 4. Choose the folder that contains your dumps, click Scan, pick a title, set its folders, then Save profile.

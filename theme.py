@@ -53,6 +53,26 @@ QPushButton#launch {{
     font-weight: bold;
     border: none;
 }}
+QTabWidget::pane {{
+    border: 1px solid #2b3040;
+    border-radius: 8px;
+    background: {BG};
+}}
+QTabBar::tab {{
+    background: {PANEL};
+    color: {TEXT};
+    border: 1px solid #2b3040;
+    border-bottom: none;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    padding: 8px 14px;
+    margin-right: 4px;
+}}
+QTabBar::tab:selected {{
+    background: {ACCENT};
+    color: #111;
+    border: 1px solid {ACCENT};
+}}
 QCheckBox {{
     color: {MUTED};
 }}

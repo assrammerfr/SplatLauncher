@@ -1,5 +1,5 @@
 __pycache__/
+*.pyc
 build/
 dist/
-*.pyc
-*.spec
+*.spec.user
