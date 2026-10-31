@@ -38,6 +38,8 @@ static LONG WINAPI on_crash(EXCEPTION_POINTERS* ep) {
          (unsigned long long)ctx.x[2], (unsigned long long)ctx.x[3],
          (unsigned long long)ctx.x[19], (unsigned long long)ctx.x[20],
          (unsigned long long)ctx.x[21], (unsigned long long)ctx.x[30]);
+    for (int i = 4; i <= 18; i++)
+        LOGF("[crash]   x%d=%llx\n", i, (unsigned long long)ctx.x[i]);
     for (int i = 0; i < 30; i++)
         if (ctx.x[i] > 0x1000 && ctx.x[i] < 0x0000800000000000ull
             && (ctx.x[i] < 0x08000000ull || ctx.x[i] > 0x22000000ull))
