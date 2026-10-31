@@ -31,6 +31,14 @@ def vc_env():
             k, _, v = line.partition("=")
             env[k] = v
     if "INCLUDE" not in env or "PATH" not in env:
+        # Non-interactive sessions (Windows Scheduled Task) can mangle the
+        # captured `set` output. Fall back to the current process env, which is
+        # correct when the caller already ran vcvars64.bat in its own session.
+        print("[build] vcvars capture incomplete (PATH=%s INCLUDE=%s); "
+              "falling back to process env"
+              % ("PATH" in env, "INCLUDE" in env))
+        env = dict(os.environ)
+    if "INCLUDE" not in env or "PATH" not in env:
         print(out.stdout[:2000], out.stderr[:2000])
         raise SystemExit("vcvars64 failed")
     return env

@@ -23,7 +23,7 @@
     "host": 0,
     "relr": 15013
    },
-   "functions": 40510,
+   "functions": 52851,
    "emitted": 0,
    "text_bytes_in_fns": 0,
    "gap_mnemonics": [],
@@ -39,7 +39,7 @@
     "host": 20,
     "relr": 528689
    },
-   "functions": 273621,
+   "functions": 307941,
    "emitted": 0,
    "text_bytes_in_fns": 0,
    "gap_mnemonics": [],
@@ -71,5 +71,5 @@
   "glslcInitialize",
   "glslcSetAllocator"
  ],
- "meta_c": 20993408
+ "meta_c": 23940828
 }

@@ -135,6 +135,18 @@ int main(int argc, char** argv) {
     LOGF("[boot] peek sdk mutex 0xec4cd44 = %08x\n",
          *(unsigned int*)0xec4cd44ull);
 
+    /* ThreadManager thread-list sentinel (nn::os::detail::ThreadManager @ 0xf290108).
+       Before any thread is registered the intrusive thread list is empty, encoded
+       as head (this+0x1d8) == sentinel (this+0x1d0). BSS zeroes both words to 0, so
+       the "zero TLS slot for all threads" helper (guest e840120, reached from sdk
+       init entry e7f4040) loads a NULL head, computes head + 31*8 + 0x80 = 0x178,
+       and faults there (boot.log crash fault=0x178 guest_pc=e840144). Seed the
+       sentinel self-referential so the walk sees an empty list and skips the loop. */
+    const uint64_t kThreadMgr = 0xf290108ull;
+    *(uint64_t*)(kThreadMgr + 0x1d0) = kThreadMgr + 0x1d0;  /* sentinel.prev = self */
+    *(uint64_t*)(kThreadMgr + 0x1d8) = kThreadMgr + 0x1d0;  /* head = sentinel (empty) */
+    LOGF("[boot] ThreadManager %llx thread-list sentinel seeded (empty)\n", kThreadMgr);
+
     /* run init arrays: sdk first, then main (tag field = module ordinal) */
     for (int i = 0; g_init_arrays[i][1]; i++) {
         uint64_t fn = g_init_arrays[i][1];
