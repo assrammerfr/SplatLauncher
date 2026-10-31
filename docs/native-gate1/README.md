@@ -57,3 +57,11 @@ No game files, no keys, no firmware in this folder. No launcher code changed.
 - Meta after fixpoint scan: g_fn_count = 411,370 (was 360,827, +50,543), all three crossers sets loaded, recomp_meta.c 27,133,461 B at 16:18. Crossers JSONs and recomp_meta.c are generated data, NOT uploaded; counts recorded in evidence/piece_a_ecccc48_fix_2026-10-31.md and gen_report.json (7,949 B).
 - Build in progress at this update: 76 sources, 62 compiled, 5 in flight, 9 queued, obj 67 files. Pathological TUs main_gen_001 at 75 min, still CPU-active; twin main_gen_002 finished at 16:51 after 70 min. Link ~30-60 min out, then re-run.
 - Gate 1 still NOT passed — boot.log / exe are still the 15:09 run until that re-run lands. nnMain + GetService log still owed.
+
+## Update 2026-10-31 17:13 CST — ecccc48 fixed, new blocker e8aa4b4
+- Pipeline: BUILD_EXIT=0, RUN_EXIT=0, 76/76 objs. New exe 403,837,440 B, new boot.log 41,424 B.
+- Measure: fn table 411,370, init 4 -> 17 again (last e879620, same as 13:02). ec7d294 STOP gone, ecccc48 STOP gone — fixpoint cross-range scan worked, init regression fixed.
+- New STOP, later in init: [unmapped] pc=e8aa4b4 not in fn table, x30=e8aa59c, [init] FAILED rc=-1, svc_count=0, undef=1.
+- Diagnosis in progress: tools/diag_e8aa.py (3,409 B) — disasm + direct-branch scan for e8aa4b4.
+- New in git with this update: BUILD.md (how it is built), FILES.md (what is source vs generated), tools/diag_e8aa.py, tools/jumptab_proto.py, tools/repair_main_shards.py, evidence/e8aa4b4_run_2026-10-31.md.
+- Gate 1 still NOT passed — nnMain + GetService log still owed. See BUILD.md and FILES.md for how to build and what is in this folder.
