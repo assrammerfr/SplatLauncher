@@ -34,7 +34,6 @@ pyinstaller --clean --onefile --windowed --name SplatLaunch --icon SplatLaunch-i
 - `core.py` — scanning, profiles, and save backup
 - `theme.py` — Splatoon-themed styling
 - `SplatLaunch-icon.png` / `SplatLaunch-icon.ico` — the launcher icon
-- `SplatLaunch-hero.jpg` — the launcher hero image
 - `requirements.txt` — PySide6
 
 ## Notes

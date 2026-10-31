@@ -65,7 +65,7 @@ pcm  pctl  pl:u  prepo:u  set  sfdnsres  ssl  time:u  vi:u
 | `hid` | Npad/touch/mouse/keyboard/sixaxis calls | to shim |
 | `acc:u0` | InitializeApplicationInfo, CheckAvailability, GetAccountId | to shim |
 | `aoc:u` | (Ryujinx logs these as ServiceNs PrepareAddOnContent / CheckAddOnContentMountStatus) | to shim — Gate 3 DLC target |
-| `nvdrv` | full ioctl list in boot log | **expected bypassed** by §2 hook (re-verify at boot) |
+| `nvdrv` | full ioctl list in boot log | **expected handled via** §2 hook (re-verify at boot) |
 | `vi:u` | SurfaceFlinger CreateLayerFromId | to shim (layer bookkeeping; pixels via NVN/DXGI) |
 | `audren:u` (+ audin/audout) | Initialize REV15, Start | to shim (WASAPI) |
 | `nifm:u` | CreateRequest/Submit/GetResult | to shim — offline result (log proves boot tolerates failure) |
