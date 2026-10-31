@@ -1,0 +1,54 @@
+{
+ "modules": {
+  "sdk": {
+   "functions": 10,
+   "text_bytes_in_fns": 6569012,
+   "gap_mnemonics": [
+    "ldarb",
+    "ldr",
+    "ldrb",
+    "str",
+    "sturb"
+   ],
+   "gap_count": 10,
+   "gen_c": 4548,
+   "relocs": {
+    "total": 11215,
+    "baked": 11215,
+    "host": 0
+   }
+  },
+  "main": {
+   "functions": 3,
+   "text_bytes_in_fns": 82122480,
+   "gap_mnemonics": [
+    "ldr"
+   ],
+   "gap_count": 3,
+   "gen_c": 1289,
+   "relocs": {
+    "total": 6004,
+    "baked": 5990,
+    "host": 14
+   }
+  }
+ },
+ "entry_nnMain": "0x442e940",
+ "host_symbols": [
+  "_ZN2nn3pia23ZSTD_trace_compress_endEyPKNS0_10ZSTD_TraceE",
+  "_ZN2nn3pia25ZSTD_trace_compress_beginEPKNS0_11ZSTD_CCtx_sE",
+  "_ZN2nn3pia25ZSTD_trace_decompress_endEyPKNS0_10ZSTD_TraceE",
+  "_ZN2nn3pia27ZSTD_trace_decompress_beginEPKNS0_11ZSTD_DCtx_sE",
+  "_ZTHN9grpc_core26ApplicationCallbackExecCtx18callback_exec_ctx_E",
+  "_ZTHN9grpc_core7ExecCtx9exec_ctx_E",
+  "glslcCompile",
+  "glslcCompilePreSpecialized",
+  "glslcCompileSpecialized",
+  "glslcFinalize",
+  "glslcGetDefaultOptions",
+  "glslcGetVersion",
+  "glslcInitialize",
+  "glslcSetAllocator"
+ ],
+ "meta_c": 837554
+}

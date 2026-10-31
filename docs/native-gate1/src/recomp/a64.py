@@ -62,6 +62,18 @@ class FnEmitter:
         self.lines.append("    " + s)
 
     # ---------- register access ----------
+    ALIAS = {"fp": "29", "lr": "30", "wfp": "29", "wlr": "30", "wsp": "31"}
+
+    @staticmethod
+    def ridx(rn):
+        """Register name -> x[] index string (handles capstone fp/lr aliases)."""
+        rn = rn.lower()
+        if rn in FnEmitter.ALIAS:
+            return FnEmitter.ALIAS[rn]
+        if rn in ("sp",):
+            return "31"
+        return rn[1:]
+
     @staticmethod
     def rd(rn, w=False):
         rn = rn.lower()
@@ -70,8 +82,8 @@ class FnEmitter:
         if rn == "sp" or rn == "wsp":
             return "c->x[31]"
         if rn[0] == "w":
-            return f"(uint32_t)c->x[{rn[1:]}]"
-        return f"c->x[{rn[1:]}]"
+            return f"(uint32_t)c->x[{FnEmitter.ridx(rn)}]"
+        return f"c->x[{FnEmitter.ridx(rn)}]"
 
     @staticmethod
     def wr(rd, expr, w=False, sp=False):
@@ -83,8 +95,8 @@ class FnEmitter:
                 return [f"c->x[31] = {expr};"]
             return []
         if w or rd[0] == "w":
-            return [f"c->x[{rd[1:]}] = (uint32_t)({expr});"]
-        return [f"c->x[{rd[1:]}] = {expr};"]
+            return [f"c->x[{FnEmitter.ridx(rd)}] = (uint32_t)({expr});"]
+        return [f"c->x[{FnEmitter.ridx(rd)}] = {expr};"]
 
     @staticmethod
     def is_w(r):
@@ -400,9 +412,13 @@ class FnEmitter:
         if m in ("ldtr", "ldtrb", "ldtrh", "ldtrsb", "ldtrsh", "ldtrsw",
                  "sttr", "sttrb", "sttrh"):
             return self._ldst(pc, m, ops, i)
-        if m in ("ldxr", "ldaxr", "stxr", "stlxr", "ldar", "stlr", "stlxr",
-                 "ldar", "ldadb", "ldadd", "ldaddl", "ldset", "ldclr", "ldeor",
-                 "swp", "swpl", "cas", "casa", "casal", "casl", "ldaddal"):
+        if m in ("ldxr", "ldaxr", "stxr", "stlxr", "ldar", "stlr",
+                 "ldarb", "ldarh", "stlrb", "stlarb", "stlarh", "stlrh",
+                 "ldxrb", "ldxrh", "stxrb", "stxrh", "ldaxrb", "ldaxrh",
+                 "stlxrb", "stlxrh", "ldar", "ldadd", "ldaddl", "ldset", "ldclr",
+                 "ldeor", "swp", "swpl", "cas", "casa", "casal", "casl",
+                 "ldaddal", "ldaddb", "ldaddh", "ldclrb", "ldclrh", "ldeorb",
+                 "ldeorh", "ldsetb", "ldseth"):
             return self._atomic(pc, m, ops, i)
         if m.startswith(("ld1", "ld2", "ld3", "ld4", "st1", "st2", "st3", "st4", "ldnp", "stnp")):
             return self._simd_ldst(pc, m, ops, i)
@@ -436,7 +452,7 @@ class FnEmitter:
         if m in ("crc32b", "crc32h", "crc32w", "crc32x", "crc32cb", "crc32ch",
                  "crc32cw", "crc32cx"):
             rd, rn, rm = ops[0][1], ops[1][1], ops[2][1]
-            self.put(self.wr(rd, f"a64_crc32({m}, {self.rd(rn, True)}, {self.rd(rm, True)})"))
+            self.put(self.wr(rd, f'a64_crc32("{m}", {self.rd(rn, True)}, {self.rd(rm, True)})'))
             return
 
         raise Unsupported(pc, word, f"unmapped mnemonic '{m}'", m)
@@ -517,11 +533,11 @@ class FnEmitter:
             w = self.is_w(rd)
             mask = 0xFFFF << shift
             if w:
-                cur = f"(uint32_t)c->x[{rd[1:]}]"
+                cur = f"(uint32_t)c->x[{self.ridx(rd)}]"
                 expr = f"(({cur} & ~{mask & 0xFFFFFFFF:#x}u) | {(imm << shift) & 0xFFFFFFFF:#x}u)"
                 self.put(self.wr(rd, expr, True))
             else:
-                cur = f"c->x[{rd[1:]}]"
+                cur = f"c->x[{self.ridx(rd)}]"
                 expr = f"(({cur} & ~{mask:#x}ull) | {(imm << shift):#x}ull)"
                 self.put(self.wr(rd, expr, False))
             return
@@ -719,13 +735,13 @@ class FnEmitter:
                 raise Unsupported(pc, 0, m, m)
             rn, rm, ra = ops[1][1], ops[2][1], ops[3][1]
             if m == "smaddl":
-                expr = f"(c->x[{ra[1:]}] + (int64_t)(int32_t){self.rd(rn, True)} * (int64_t)(int32_t){self.rd(rm, True)})"
+                expr = f"(c->x[{self.ridx(ra)}] + (int64_t)(int32_t){self.rd(rn, True)} * (int64_t)(int32_t){self.rd(rm, True)})"
             elif m == "umaddl":
-                expr = f"(c->x[{ra[1:]}] + (uint64_t)(uint32_t){self.rd(rn, True)} * (uint64_t)(uint32_t){self.rd(rm, True)})"
+                expr = f"(c->x[{self.ridx(ra)}] + (uint64_t)(uint32_t){self.rd(rn, True)} * (uint64_t)(uint32_t){self.rd(rm, True)})"
             elif m == "smsubl":
-                expr = f"(c->x[{ra[1:]}] - (int64_t)(int32_t){self.rd(rn, True)} * (int64_t)(int32_t){self.rd(rm, True)})"
+                expr = f"(c->x[{self.ridx(ra)}] - (int64_t)(int32_t){self.rd(rn, True)} * (int64_t)(int32_t){self.rd(rm, True)})"
             else:
-                expr = f"(c->x[{ra[1:]}] - (uint64_t)(uint32_t){self.rd(rn, True)} * (uint64_t)(uint32_t){self.rd(rm, True)})"
+                expr = f"(c->x[{self.ridx(ra)}] - (uint64_t)(uint32_t){self.rd(rn, True)} * (uint64_t)(uint32_t){self.rd(rm, True)})"
             self.put(self.wr(rd, expr))
             return
         raise Unsupported(pc, 0, m, m)
@@ -941,7 +957,7 @@ class FnEmitter:
             raise Unsupported(pc, 0, "ldst non-mem", m)
         mm = mem[1]
         self._cur_insn = i
-        base = self.rd(mm.base, False)
+        base = self.rd(i.reg_name(mm.base), False)
         addr = self._mem_expr(mm, i, ops)
         # post/pre index: extra imm operand (3rd token) — detect via raw operand count
         # capstone: for [x0, #8]!  the writeback is implied; op_str ends with '!'
@@ -976,20 +992,17 @@ class FnEmitter:
             val = self.rd(rt, w_rt) if rt.lower() not in ("wzr", "xzr") else ("0u" if w_rt else "0ull")
             self.em(f"st{esz}(c, {addr}, {val if esz >= 32 else f'(uint{esz}_t)({val})'});")
         # writeback
-        if raw_imm is not None:
-            if i.op_str.rstrip().endswith("]!"):
-                self.em(f"c->x[{mm.base[1:]}] = ({base} + ({raw_imm}));")
-            elif not i.op_str.rstrip().endswith("]") or "]" in i.op_str.split(",")[-1]:
-                pass
-        # post-index detection: capstone op_str: "x0, [x1], #8"
-        if ", [" in i.op_str and "], #" in i.op_str:
-            self.em(f"c->x[{mm.base[1:]}] = ({base} + ({raw_imm}));" if raw_imm is not None else "")
+        bname = i.reg_name(mm.base)
+        if i.op_str.rstrip().endswith("]!"):
+            self.em(f"c->x[{self.ridx(bname)}] = {addr};")  # pre-index: new base = addr
+        elif ", [" in i.op_str and "], #" in i.op_str and raw_imm is not None:
+            self.em(f"c->x[{self.ridx(bname)}] = ({base} + ({raw_imm}));")
 
     def _mem_expr(self, mm, i, ops):
-        base = self.rd(mm.base, False)
+        base = self.rd(i.reg_name(mm.base), False)
         expr = base
         if mm.index:
-            idx = self.rd(mm.index, False)
+            idx = self.rd(i.reg_name(mm.index), False)
             # shift from operand shift (capstone attaches to mem op? use op_str heuristic)
             mstr = i.op_str
             shift = None
@@ -1028,14 +1041,14 @@ class FnEmitter:
             v2 = self.rd(r2, w1) if r2.lower() not in ("wzr", "xzr") else ("0u" if w1 else "0ull")
             self.em(f"{f}(c, {addr}, {v1});")
             self.em(f"{f}(c, ({addr} + {4 if w1 else 8}), {v2});")
-        base = self.rd(mem.base, False)
-        breg = mem.base[1:] if mem.base.lower() not in ("xzr", "wzr") else None
+        base = self.rd(i.reg_name(mem.base), False)
+        bname = i.reg_name(mem.base)
+        breg = self.ridx(bname) if bname.lower() not in ("xzr", "wzr") else None
         if breg:
-            if ", [" in i.op_str and "], #" in i.op_str.split("[")[-1]:
-                imm = ops[3][1] if len(ops) > 3 else 0
-                self.em(f"c->x[{breg}] = ({base} + ({imm}));")
-            elif i.op_str.rstrip().endswith("]!"):
-                imm = ops[3][1] if len(ops) > 3 else 0
+            if i.op_str.rstrip().endswith("]!"):
+                self.em(f"c->x[{breg}] = {addr};")  # pre-index
+            elif ", [" in i.op_str and "], #" in i.op_str:
+                imm = ops[3][1] if len(ops) > 3 and ops[3][0] == "imm" else mem.disp
                 self.em(f"c->x[{breg}] = ({base} + ({imm}));")
 
     def _atomic(self, pc, m, ops, i):
@@ -1170,18 +1183,18 @@ class FnEmitter:
             if src[0] == "reg":
                 if rd[0] in ("x", "w") and src[1][0] in ("d", "s"):   # gpr -> fpr
                     if src[1][0] == "s":
-                        self.em(f"c->d[{rd[1:]}] = (uint64_t)(uint32_t)c->x[{src[1][1:]}];" if rd[0] == "w" else f"c->d[{rd[1:]}] = c->x[{src[1][1:]}];")
+                        self.em(f"c->d[{rd[1:]}] = (uint64_t)(uint32_t)c->x[{self.ridx(src[1][1:])}];" if rd[0] == "w" else f"c->d[{rd[1:]}] = c->x[{self.ridx(src[1][1:])}];")
                     else:
                         if rd[0] == "w":
-                            store32(rd, f"u32f((uint32_t)c->x[{src[1][1:]}])")
+                            store32(rd, f"u32f((uint32_t)c->x[{self.ridx(src[1][1:])}])")
                         else:
-                            store64(rd, f"u64f(c->x[{src[1][1:]}])")
+                            store64(rd, f"u64f(c->x[{self.ridx(src[1][1:])}])")
                     return
                 if rd[0] in ("d", "s") and src[1][0] in ("x", "w"):   # fpr -> gpr
                     if src[1][0] == "w" or rd[0] == "s":
-                        self.put(self.wr(rd, f"(uint32_t)c->d[{src[1][1:]}]", True))
+                        self.put(self.wr(rd, f"(uint32_t)c->d[{self.ridx(src[1][1:])}]", True))
                     else:
-                        self.put(self.wr(rd, f"c->d[{src[1][1:]}]"))
+                        self.put(self.wr(rd, f"c->d[{self.ridx(src[1][1:])}]"))
                     return
                 # fpr -> fpr
                 if rd[0] == "s" and src[1][0] == "s":
