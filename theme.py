@@ -1,4 +1,4 @@
-﻿"""Splatoon-themed palette and styling for the SplatLaunch-inspired launcher layout."""
+﻿"""Splatoon-themed palette and styling for the launcher layout."""
 
 S2_PINK = "#FF2E88"
 S2_TURQ = "#00E5C0"

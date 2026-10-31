@@ -1,4 +1,4 @@
-﻿"""PySide6 launcher frontend: SplatLaunch-inspired Games layout with Splatoon styling."""
+﻿"""PySide6 launcher frontend: Games layout with Splatoon styling."""
 import shutil
 import sys
 from pathlib import Path
