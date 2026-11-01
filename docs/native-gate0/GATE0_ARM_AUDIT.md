@@ -30,7 +30,7 @@ This is not an argument from theory. Three independent, verifiable facts carry t
    sp2decomp repo on disk and confirmed by three separate public recomp projects.
 
 **One external dependency blocks Gate 1**: a decrypted Splatoon 3 v11.2.0 program dump (ExeFS).
-See §7 — that is the single file only Seth can supply. No other blocker.
+See §7 — that is the single file only the project owner can supply. No other blocker.
 
 **Scope note (prompt §"Method"):** Gate 0 does not claim FPS. The measurable win/loss against
 Ryujinx happens at Gate 2 with CSVs. This audit only establishes that the ARM path, the service
@@ -51,7 +51,7 @@ surface, the NVN surface and the file formats are known and buildable.
 | NintendoSDK framework code inside `sdk` NSO (NintendoWare Vfx2/Ui2d/G3d2, Havok, sead) | Recompiled guest code (it is ordinary A64) — no shimming needed | Translatable |
 | Network / NPLN / Pia (online) | Offline stubs returning offline errors (Ryujinx log proves title reaches play with Nifm failing: `ReadyNetworkFailed` report, boot continues) | Blocked by hard stop (no online work) — shim must return offline, not fail boot |
 | Firmware files, sysmodules (qlaunch etc.) | Not used: applet/display paths HLE'd; no firmware input | Blocked by hard stop (no firmware input) — shim instead |
-| Program decryption (keys) | **Not performed by this builder**; runtime consumes Seth's local decrypted dump | Blocked — the one file (§7) |
+| Program decryption (keys) | **Not performed by this builder**; runtime consumes the project owner's local decrypted dump | Blocked — the one file (§7) |
 
 ---
 
@@ -170,7 +170,7 @@ equivalent milestone.
 Source of truth has two parts: (a) **observed** calls in this title's boot log on this PC (§2) —
 these are Ryujinx-stubbed calls, i.e. real guest requests; (b) the title's **NPDM service ACL**
 (`main.npdm`, inside the ExeFS of §7) which is the *authoritative authorized set* — enumeration
-completes the moment Seth supplies that file, and our `sm` shim logs every request anyway
+completes the moment the project owner supplies that file, and our `sm` shim logs every request anyway
 (closed-loop verification).
 
 | Service | Observed calls at boot→title (log) | Status |
@@ -282,7 +282,7 @@ blocked-on-pipeline-design, not on any missing input.
 
 ---
 
-## 7. What's blocked, and the one file only Seth can supply
+## 7. What's blocked, and the one file only the project owner can supply
 
 **BLOCKED — single artifact:** a **decrypted Splatoon 3 v11.2.0 program dump (ExeFS)** containing:
 `main.npdm` + `rtld`, `main`, `sdk` NSOs (raw `.nso` files), from the update title
@@ -291,7 +291,7 @@ blocked-on-pipeline-design, not on any missing input.
 - Why: the recompiler's input is a decrypted NSO; the NPDM is also the authoritative service list
   (§4). Verified: no `.nso` and no ExeFS directory exists anywhere on `E:` (search in §2), and this
   builder may not use keys/firmware (prompt rules) or re-run hactool (prompt rules). Producing this
-  dump requires Seth's keys with hactool/nxdumptool or equivalent on his side.
+  dump requires the project owner's keys with hactool/nxdumptool or equivalent on the owner's side.
 - What it unblocks: import-table scan (NVN hook confirmation), exact NVN name list, exact NPDM
   service ACL, MOD0/relocation bases for `--base`, and the first runnable unit itself.
 - Everything else for Gate 1 (host runtime skeleton, service shims, format parsers, DX12 device

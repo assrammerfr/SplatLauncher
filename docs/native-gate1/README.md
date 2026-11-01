@@ -87,7 +87,7 @@ No game files, no keys, no firmware, no titlekeys, no NSO bytes, and no decrypte
 - Measure: fn table 411,370 -> 438,383 (+27,013), init 17 -> 438. ec7d294, ecccc48, and e8aa4b4 STOPs all gone.
 - New STOP, much later: [undef] pc=90763a0 word=0 mn=dup -> STOP, then [unmapped] pc=90763a0 not in fn table, [init] FAILED rc=-1, svc_count=0, undef=2.
 - gen.py 24,851 -> 26,426 B (17:31), gen_report.json 7,949 -> 8,047 B (17:46). Evidence: evidence/e8aa4b4_fix_1830_run_2026-10-31.md. Generated recomp_meta.c (28,839,782 B) NOT uploaded.
-- This run met the Freebuff V4 build watch stop condition (new STOP with init past 17). Watch reported once and is done; removal is Seth's call.
+- This run met the Freebuff V4 build watch stop condition (new STOP with init past 17). Watch reported once and is done; removal is the project owner's call.
 - Gate 1 still NOT passed — nnMain + GetService log still owed.
 
 ## Update 2026-10-31 23:39 CST — emitter coverage work, no new run yet

@@ -71,7 +71,6 @@ The native runtime targets modern DX12 FL_11_1 GPUs (RX 5700 XT and newer). It i
 
 ## Contributors
 
-- Seth (assrammerfr) — project owner and director
 - Freebuff — Gate 0 and Gate 1 builder
 - Muse — build prompts, verification, and repository publishing
 - Claude and VS Copilot — launcher interface work only, not the native runtime
