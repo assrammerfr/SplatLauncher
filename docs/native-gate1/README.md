@@ -9,8 +9,8 @@ SplatNative is a title-specific static recompilation of Splatoon 3 (A64 to C to 
 | Gate 1 pass bar | Recompiled rtld, main, and SDK run to `nnMain` with a `GetService` enumeration log |
 | Gate 1 | Not passed |
 | Latest run | 2026-11-01 01:33 — init 438 of 6,858, stopping at `90763a0` (`dup` SIMD gap), no `nnMain`, no `GetService` |
-| Current work | Build-blocking SIMD emitter fixes: 9 classes across 56 failing translation units, ~2,291 errors (see the 2026-11-01 entries in the progress log) |
-| Build state | No executable at last check — the previous build failed with C2440 errors and did not link |
+| Current work | Build-blocking SIMD emitter fixes: 9 classes across 56 failing translation units, ~2,291 errors (see the 2026-11-01 entries in the progress log). Midday source growth: a64.py 136,486 B (12:00), a64_ctx.h 89,777 B (12:27), PC CPU at 98-100% with Freebuff dominant at 14:10-14:25 |
+| Build state | No executable at last check (14:25) — the previous build failed with C2440 errors and did not link, and no new build has linked yet |
 | Next step | Full regeneration, build, and run that clears the build errors and moves init past 438, with no `[unmapped]` on jump-table targets |
 
 ## Contents

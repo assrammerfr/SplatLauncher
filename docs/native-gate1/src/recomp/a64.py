@@ -573,7 +573,7 @@ class FnEmitter:
 
         # ---- FP ----
         if m in ("fmov", "fabs", "fneg", "fsqrt", "fadd", "fsub", "fmul", "fdiv",
-                 "fmax", "fmin", "fmaxnm", "fminnm", "fmadd", "fmsub", "fnmadd",
+                 "fabd", "fmax", "fmin", "fmaxnm", "fminnm", "fmadd", "fmsub", "fnmadd",
                  "fnmsub", "fcmp", "fcmpe", "fccmp", "fccmn", "fcsel", "fcvt",
                  "fcvtzs", "fcvtzu", "scvtf", "ucvtf", "frintn", "frintp", "frintm",
                  "frintz", "frinta", "frintx", "frinti", "fnm", "fms", "fmad", "fmia",
@@ -2233,16 +2233,18 @@ class FnEmitter:
             raise Unsupported(pc, 0, "fmov imm", "fmov")
         import struct as _s
         idx = self.ridx(rd)
+        fm = self._newtmp(1)[0]  # unique temp: a hardcoded __fm redeclared in the
+        # same emitted function scope trips MSVC C2086 on a second fmov-imm.
         if esz == 8:
             bits = _s.unpack("<Q", _s.pack("<d", float(src[1])))[0]
-            self.em(f"V128 __fm; __fm.lo = {bits:#x}ull; __fm.hi = {bits:#x}ull;")
-            self.em(f"vst128(c, {idx}, __fm);")
+            self.em(f"V128 {fm}; {fm}.lo = {bits:#x}ull; {fm}.hi = {bits:#x}ull;")
+            self.em(f"vst128(c, {idx}, {fm});")
         else:
             bits = _s.unpack("<I", _s.pack("<f", float(src[1])))[0]
             rep = bits | (bits << 32)
             if lanes * esz >= 16:
-                self.em(f"V128 __fm; __fm.lo = {rep:#x}ull; __fm.hi = {rep:#x}ull;")
-                self.em(f"vst128(c, {idx}, __fm);")
+                self.em(f"V128 {fm}; {fm}.lo = {rep:#x}ull; {fm}.hi = {rep:#x}ull;")
+                self.em(f"vst128(c, {idx}, {fm});")
             elif lanes * esz == 8:
                 self.em(f"c->d[{idx}] = {rep:#x}ull;")
             else:
@@ -2425,8 +2427,9 @@ class FnEmitter:
         out = self._newtmp(1)[0]
         # VSHI family: v_{m}_{lane}(V128, int n)
         fn = f"v_{m}_{sfx}"
-        if m in ("ssra", "ursra", "srsra", "usra"):
-            # accumulate-into-dest shifts read the dest first
+        if m in ("ssra", "ursra", "srsra", "usra", "sli", "sri"):
+            # accumulate / insert-into-dest shifts (ssra family, sli/sri) read
+            # the destination Vd first: Vd = (Vd op n) | (Vn complement).
             cur = self._vld(self._newtmp(1)[0], rd)
             self.em(f"V128 {out} = {fn}({cur}, {a}, {n});")
         else:
@@ -2707,7 +2710,7 @@ class FnEmitter:
 
         a_t = srcs[0]
         a = (self._vld(self._newtmp(1)[0], a_t[1]) if a_t[0] == "v"
-             else self._elem_expr(pc, a_t, esz))
+             else self._elem_expr(pc, a_t, esz, broadcast=True))
 
         # ---- unary with an explicit single source (cnt v0.8b, v1.8b) ----
         if m in UNARY and len(srcs) >= 1:
@@ -2803,6 +2806,11 @@ class FnEmitter:
             self.em(f"V128 {out} = {INT_CMP[m]}_{self._lane_suffix(esz)}({a}, {b_expr});")
         elif m in ACC3 and b_expr is not None and c_expr is not None:
             self.em(f"V128 {out} = {ACC3[m]}_{sfx}({c_expr}, {a}, {b_expr});")
+        elif m in ("faddp", "fmaxp", "fminp") and b_expr is not None and sfx:
+            # pairwise FP ops are named by arrangement (.4s/.2s/.2d) in a64_ctx.h,
+            # not by fp lane type -- derive the suffix from lanes + esz.
+            arr_sfx = f"{lanes}{'s' if esz == 4 else 'd'}"
+            self.em(f"V128 {out} = v_{m}_{arr_sfx}({a}, {b_expr});")
         elif m in FP_BIN and b_expr is not None and sfx:
             self.em(f"V128 {out} = {FP_BIN[m]}_{sfx}({a}, {b_expr});")
         elif m in INT_BIN and b_expr is not None:
@@ -2878,13 +2886,16 @@ class FnEmitter:
             else:
                 self.em(f"V128 {st} = v_scalbn_f64({a}, {sh});")
             src = st
-        # int result -> lane suffix of the int side
+        # int result -> lane suffix of the int side; signedness follows the
+        # mnemonic tail (fcvtzs->'s', fcvtzu->'u') / head (scvtf->'s', ucvtf->'u')
         if m.startswith("fcvt"):
             isz = esz  # same lane width for fcvtzs/fcvtzu on same arrangement
-            fn = f"v_{m}_{self._lane_suffix(isz)}_{sfx}"
+            int_sfx = f"{m[-1]}{isz * 8}"  # fcvtzs->s32, fcvtzu->u32
+            fn = f"v_{m}_{int_sfx}_{sfx}"
             self.em(f"V128 {out} = {fn}({src});")
         else:
-            fn = f"v_{m}_{sfx}_{self._lane_suffix(esz)}"
+            int_sfx = f"{m[0]}{esz * 8}"  # scvtf->s32, ucvtf->u32
+            fn = f"v_{m}_{sfx}_{int_sfx}"
             self.em(f"V128 {out} = {fn}({src});")
         self._vst(rd, out, esz, lanes)
 

@@ -1570,6 +1570,36 @@ static inline V128 v_cmeq_s64(V128 a, V128 b) { V128 r; int64_t x[2], y[2]; memc
 static inline V128 v_urhadd_u8(V128 a, V128 b) { V128 r; uint8_t x[16], y[16]; int i; memcpy(x, &a, 16); memcpy(y, &b, 16); for (i = 0; i < 16; i++) ((uint8_t*)&r)[i] = (uint8_t)(((unsigned)x[i] + (unsigned)y[i] + 1) >> 1); return r; }
 static inline V128 v_shsub_u8(V128 a, V128 b)  { V128 r; uint8_t x[16], y[16]; int i; memcpy(x, &a, 16); memcpy(y, &b, 16); for (i = 0; i < 16; i++) ((uint8_t*)&r)[i] = (uint8_t)(((int)x[i] - (int)y[i]) >> 1); return r; }
 static inline V128 v_uhsub_u8(V128 a, V128 b)  { V128 r; uint8_t x[16], y[16]; int i; memcpy(x, &a, 16); memcpy(y, &b, 16); for (i = 0; i < 16; i++) ((uint8_t*)&r)[i] = (uint8_t)(((unsigned)x[i] - (unsigned)y[i]) >> 1); return r; }
+/* halving subtract, wider lanes (gap-driven: census flagged v_shsub_u16) */
+static inline V128 v_shsub_u16(V128 a, V128 b)  { V128 r; uint16_t x[8], y[8]; int i; memcpy(x, &a, 16); memcpy(y, &b, 16); for (i = 0; i < 8; i++) ((uint16_t*)&r)[i] = (uint16_t)(((int16_t)x[i] - (int16_t)y[i]) >> 1); return r; }
+static inline V128 v_shsub_u32(V128 a, V128 b)  { V128 r; uint32_t x[4], y[4]; int i; memcpy(x, &a, 16); memcpy(y, &b, 16); for (i = 0; i < 4; i++) ((uint32_t*)&r)[i] = (uint32_t)(((int32_t)x[i] - (int32_t)y[i]) >> 1); return r; }
+static inline V128 v_uhsub_u16(V128 a, V128 b)  { V128 r; uint16_t x[8], y[8]; int i; memcpy(x, &a, 16); memcpy(y, &b, 16); for (i = 0; i < 8; i++) ((uint16_t*)&r)[i] = (uint16_t)(((uint32_t)x[i] - (uint32_t)y[i]) >> 1); return r; }
+static inline V128 v_uhsub_u32(V128 a, V128 b)  { V128 r; uint32_t x[4], y[4]; int i; memcpy(x, &a, 16); memcpy(y, &b, 16); for (i = 0; i < 4; i++) ((uint32_t*)&r)[i] = (uint32_t)(((uint32_t)x[i] - (uint32_t)y[i]) >> 1); return r; }
+/* pairwise FP, 2-scalar form (Vd[0]=Vn[0]+Vn[1], Vd[1]=Vm[0]+Vm[1]) */
+static inline V128 v_faddp_2s(V128 a, V128 b) { float x[2], y[2], o[2]; V128 r; memcpy(x, &a, 8); memcpy(y, &b, 8); o[0] = x[0] + x[1]; o[1] = y[0] + y[1]; memcpy(&r, o, 8); r.hi = 0; return r; }
+static inline V128 v_fmaxp_2s(V128 a, V128 b) { float x[2], y[2], o[2]; V128 r; memcpy(x, &a, 8); memcpy(y, &b, 8); o[0] = a64_fmax_32(x[0], x[1]); o[1] = a64_fmax_32(y[0], y[1]); memcpy(&r, o, 8); r.hi = 0; return r; }
+static inline V128 v_fminp_2s(V128 a, V128 b) { float x[2], y[2], o[2]; V128 r; memcpy(x, &a, 8); memcpy(y, &b, 8); o[0] = a64_fmin_32(x[0], x[1]); o[1] = a64_fmin_32(y[0], y[1]); memcpy(&r, o, 8); r.hi = 0; return r; }
+/* FP reciprocal / rsqrt estimates (games refine via frecpe/frsqrts newton step;
+   exact 1/x and 1/sqrt here are within the estimate's use and bit-sane) */
+static inline V128 v_frecpe_f32(V128 a) { V128 r; float x[4], o[4]; int i; memcpy(x, &a, 16); for (i = 0; i < 4; i++) o[i] = 1.0f / x[i]; memcpy(&r, o, 16); return r; }
+static inline V128 v_frecpe_f64(V128 a) { V128 r; double x[2], o[2]; int i; memcpy(x, &a, 16); for (i = 0; i < 2; i++) o[i] = 1.0 / x[i]; memcpy(&r, o, 16); return r; }
+static inline V128 v_frsqrte_f32(V128 a) { V128 r; float x[4], o[4]; int i; memcpy(x, &a, 16); for (i = 0; i < 4; i++) o[i] = 1.0f / sqrtf(x[i]); memcpy(&r, o, 16); return r; }
+static inline V128 v_frsqrte_f64(V128 a) { V128 r; double x[2], o[2]; int i; memcpy(x, &a, 16); for (i = 0; i < 2; i++) o[i] = 1.0 / sqrt(x[i]); memcpy(&r, o, 16); return r; }
+/* FP rounding: n=nearest-even p=ceil m=floor z=trunc a=away x/i=current(=nearest) */
+static inline V128 v_frintn_f32(V128 a) { V128 r; float x[4], o[4]; int i; memcpy(x, &a, 16); for (i = 0; i < 4; i++) o[i] = nearbyintf(x[i]); memcpy(&r, o, 16); return r; }
+static inline V128 v_frintn_f64(V128 a) { V128 r; double x[2], o[2]; int i; memcpy(x, &a, 16); for (i = 0; i < 2; i++) o[i] = nearbyint(x[i]); memcpy(&r, o, 16); return r; }
+static inline V128 v_frintp_f32(V128 a) { V128 r; float x[4], o[4]; int i; memcpy(x, &a, 16); for (i = 0; i < 4; i++) o[i] = ceilf(x[i]); memcpy(&r, o, 16); return r; }
+static inline V128 v_frintp_f64(V128 a) { V128 r; double x[2], o[2]; int i; memcpy(x, &a, 16); for (i = 0; i < 2; i++) o[i] = ceil(x[i]); memcpy(&r, o, 16); return r; }
+static inline V128 v_frintm_f32(V128 a) { V128 r; float x[4], o[4]; int i; memcpy(x, &a, 16); for (i = 0; i < 4; i++) o[i] = floorf(x[i]); memcpy(&r, o, 16); return r; }
+static inline V128 v_frintm_f64(V128 a) { V128 r; double x[2], o[2]; int i; memcpy(x, &a, 16); for (i = 0; i < 2; i++) o[i] = floor(x[i]); memcpy(&r, o, 16); return r; }
+static inline V128 v_frintz_f32(V128 a) { V128 r; float x[4], o[4]; int i; memcpy(x, &a, 16); for (i = 0; i < 4; i++) o[i] = truncf(x[i]); memcpy(&r, o, 16); return r; }
+static inline V128 v_frintz_f64(V128 a) { V128 r; double x[2], o[2]; int i; memcpy(x, &a, 16); for (i = 0; i < 2; i++) o[i] = trunc(x[i]); memcpy(&r, o, 16); return r; }
+static inline V128 v_frinta_f32(V128 a) { V128 r; float x[4], o[4]; int i; memcpy(x, &a, 16); for (i = 0; i < 4; i++) o[i] = roundf(x[i]); memcpy(&r, o, 16); return r; }
+static inline V128 v_frinta_f64(V128 a) { V128 r; double x[2], o[2]; int i; memcpy(x, &a, 16); for (i = 0; i < 2; i++) o[i] = round(x[i]); memcpy(&r, o, 16); return r; }
+static inline V128 v_frintx_f32(V128 a) { V128 r; float x[4], o[4]; int i; memcpy(x, &a, 16); for (i = 0; i < 4; i++) o[i] = nearbyintf(x[i]); memcpy(&r, o, 16); return r; }
+static inline V128 v_frintx_f64(V128 a) { V128 r; double x[2], o[2]; int i; memcpy(x, &a, 16); for (i = 0; i < 2; i++) o[i] = nearbyint(x[i]); memcpy(&r, o, 16); return r; }
+static inline V128 v_frinti_f32(V128 a) { V128 r; float x[4], o[4]; int i; memcpy(x, &a, 16); for (i = 0; i < 4; i++) o[i] = nearbyintf(x[i]); memcpy(&r, o, 16); return r; }
+static inline V128 v_frinti_f64(V128 a) { V128 r; double x[2], o[2]; int i; memcpy(x, &a, 16); for (i = 0; i < 2; i++) o[i] = nearbyint(x[i]); memcpy(&r, o, 16); return r; }
 
 /* ---- pairwise add (non-narrowing) ---- */
 

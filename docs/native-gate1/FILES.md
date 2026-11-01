@@ -1,16 +1,17 @@
 # SplatNative Gate 1 — What's In This Folder, and What's Built
 
-Snapshot as of the 2026-11-01 09:11 C2440 SIMD header fix (latest run
-still 2026-11-01 01:33, init 438, STOP 90763a0). Sizes are from the PC,
-verified from disk at push time. Generated outputs are listed so you
-can tell source from build artifact — generated outputs are NOT in git.
+Snapshot as of the 2026-11-01 midday SIMD emitter work (latest run
+still 2026-11-01 01:33, init 438, STOP 90763a0, no executable).
+Sizes are from the PC, verified from disk at push time. Generated
+outputs are listed so you can tell source from build artifact —
+generated outputs are NOT in git.
 
 ## Source — committed
-- `src/recomp/a64.py` (135,621 B at 09:11, was 82,107 B) — A64 to C static recompiler, now being extended for SIMD/FP emitter coverage.
+- `src/recomp/a64.py` (136,486 B at 12:00, was 135,621 B at 09:11) — A64 to C static recompiler, now being extended for SIMD/FP emitter coverage.
 - `src/runtime/main.c` (8,381 B) — host runtime entry, ThreadManager
   sentinel seed, crash logging, fn table, init dispatch.
 - `src/runtime/nso_loader.c` (11,952 B) — NSO loader, owns REIr application.
-- `src/runtime/a64_ctx.h` (84,698 B at 09:11, was 12,118 B), `src/runtime/a64_helpers.c` (8,628 B) — context + SIMD helpers, now including mla/mls, umaxv, uaddlv, VTERN/VRED definitions that the emitter calls.
+- `src/runtime/a64_ctx.h` (89,777 B at 12:27, was 84,698 B at 09:11), `src/runtime/a64_helpers.c` (8,628 B) — context + SIMD helpers, now including mla/mls, umaxv, uaddlv, VTERN/VRED definitions that the emitter calls.
 - `src/runtime/vendor/lz4.c` + `lz4.h` — third-party LZ4, NOT committed.
 
 ## Tools — committed
