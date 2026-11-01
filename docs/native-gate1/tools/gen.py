@@ -136,21 +136,33 @@ def scan_jump_tables(mod):
         if imm & 0x100000: imm -= 0x200000
         return pc + imm
 
-    def resolve_addr(idx, reg):
-        for p in range(idx, max(idx - 8, 0) - 1, -1):
+    def resolve_addr(idx, reg, window=256):
+        # Backward scan from the use site, up to `window` instructions.
+        # The FIRST def of reg decides the result: a def we cannot model ends
+        # the search with None (otherwise a wide window would skip past a
+        # redefinition and return a stale page). add reg,reg,#... accumulators
+        # pass through (adrp/add pairs, and the add xT,xT,xIdx,lsl#2 step
+        # itself when resolve is called from Case B with rt==base).
+        # Observed miss: adrp x13 @ e8aa49c feeds the jump-table byte load
+        # @ e8aa4e8 (19 insns, beyond the old 8-insn window), so table targets
+        # base 0xe8aa4b4 were never seeded -> [unmapped] pc=e8aa4b4 STOP.
+        for p in range(idx, max(idx - window, 0) - 1, -1):
             w = arr[p]; rd = w & 31
             if rd != reg:
                 continue
             if (w & 0x9F000000) == 0x90000000:      # ADRP
                 page = adrp_page(pc_of(p), w)
-                for q in range(p + 1, min(p + 4, idx + 1)):
+                for q in range(p + 1, min(p + 8, idx + 1)):
                     w2 = arr[q]
                     if (w2 & 0xFFC00000) == 0x91000000 and (w2 & 31) == reg and ((w2 >> 5) & 31) == reg:
                         return page + ((w2 >> 10) & 0xFFF)
                 return page
             if (w & 0xFF000000) == 0x10000000:      # ADR
                 return adr_addr(pc_of(p), w)
-        return None
+            if (w & 0xFF000000) in (0x91000000, 0x11000000, 0x8B000000, 0x0B000000) \
+               and rd == ((w >> 5) & 31):
+                continue          # add reg,reg,reg/#imm accumulation
+            return None           # reg redefined by an unmodelled insn
 
     def is_indexed_load(w):
         top = (w >> 24) & 0xFF
@@ -182,7 +194,7 @@ def scan_jump_tables(mod):
                and (w1 & 31) == rt:
                 continue
         last = None
-        for p in range(i - 1, max(i - 6, 0) - 1, -1):
+        for p in range(i - 1, max(i - 12, 0) - 1, -1):
             if (arr[p] & 31) == rt:
                 last = p; break
         if last is None:
@@ -214,7 +226,7 @@ def scan_jump_tables(mod):
             if base is None or not (tlo <= base < thi):
                 continue
             lseek = None
-            for p in range(last - 1, max(last - 8, 0) - 1, -1):
+            for p in range(last - 1, max(last - 16, 0) - 1, -1):
                 if (arr[p] & 31) == rm and is_indexed_load(arr[p]):
                     lseek = p; break
             if lseek is None:
@@ -454,6 +466,18 @@ def main():
                 cx = {int(v) for v in json.load(cf)}
             extra |= cx
             ncx = len(cx)
+        mod["extra_starts"] = extra
+        # Recompute cross-range branch targets in-process against the FINAL
+        # start set: widened jump-table resolution adds starts that split
+        # ranges again, so a previously saved crossers json cannot cover them.
+        # Requires every direct branch target to be either a start or reachable
+        # by in-range goto — otherwise computed transfers dispatch to nothing.
+        import scan_crossers as _sc
+        mod["_extra_base"] = set(extra)
+        pairs = _sc.scan_pairs(mod)
+        added, _nf = _sc.fixpoint(mod, pairs)
+        extra |= added
+        ncx += len(added)
         mod["extra_starts"] = extra
         print(f"[gen] {mod['name']}: {len(plt[mod['name']])} PLT stubs, "
               f"{len(njt)} jump-table targets, {ncx} cross-range targets, "

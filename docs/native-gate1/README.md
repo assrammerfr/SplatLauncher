@@ -65,3 +65,11 @@ No game files, no keys, no firmware in this folder. No launcher code changed.
 - Diagnosis in progress: tools/diag_e8aa.py (3,409 B) — disasm + direct-branch scan for e8aa4b4.
 - New in git with this update: BUILD.md (how it is built), FILES.md (what is source vs generated), tools/diag_e8aa.py, tools/jumptab_proto.py, tools/repair_main_shards.py, evidence/e8aa4b4_run_2026-10-31.md.
 - Gate 1 still NOT passed — nnMain + GetService log still owed. See BUILD.md and FILES.md for how to build and what is in this folder.
+
+## Update 2026-10-31 18:30 CST — e8aa4b4 fixed, new blocker 90763a0
+- Pipeline: new exe 406,729,216 B, new boot.log 73,548 B, 3,108 lines.
+- Measure: fn table 411,370 -> 438,383 (+27,013), init 17 -> 438. ec7d294, ecccc48, and e8aa4b4 STOPs all gone.
+- New STOP, much later: [undef] pc=90763a0 word=0 mn=dup -> STOP, then [unmapped] pc=90763a0 not in fn table, [init] FAILED rc=-1, svc_count=0, undef=2.
+- gen.py 24,851 -> 26,426 B (17:31), gen_report.json 7,949 -> 8,047 B (17:46). Evidence: evidence/e8aa4b4_fix_1830_run_2026-10-31.md. Generated recomp_meta.c (28,839,782 B) NOT uploaded.
+- This run met the Freebuff V4 build watch stop condition (new STOP with init past 17). Watch reported once and is done; removal is Seth's call.
+- Gate 1 still NOT passed — nnMain + GetService log still owed.
