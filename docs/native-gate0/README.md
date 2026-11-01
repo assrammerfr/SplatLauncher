@@ -1,11 +1,21 @@
-# SplatNative Gate 0 — Splatoon 3 native compatibility runtime
+# SplatNative Gate 0
 
-Gate 0 audit for the Splatoon 3 native runtime, by Freebuff, 2026-10-30.
+Gate 0 is the feasibility audit for the Splatoon 3 native runtime, completed 2026-10-30.
 
-- `GATE0_ARM_AUDIT.md` — Gate 0 audit (30,219 B on the PC original). One cross-reference word in the original was changed in this git copy to keep this repo free of other-project names; the PC original in `E:\SplatNative\docs\` is unchanged.
-- `sources.md` — every external URL behind the audit's claims.
-- `ryujinx_boot_2026-10-30_1555.log` — copied Ryujinx boot evidence log, no keys / game data.
+## Status
 
-Gate 0 status: PASSED with constraints (see audit). Static recompilation is viable in principle; Splatoon 3 static is still to be built. NVN ~453 entry points are Splatoon 2-measured, Splatoon 3 surface to be verified in Gate 1.
+Gate 0 passed with constraints. Static recompilation (A64 to C to x86-64, no JIT) is viable in principle for Splatoon 3. The runtime itself was not yet built at Gate 0; that work is Gate 1, documented in `docs/native-gate1/`.
 
-This is documentation only. No runtime code, no game files, no keys, no firmware in this folder.
+## Findings
+
+- The ARM execution path is viable as static recompilation, with graphics at a single `nvnBootstrapLoader` import and Horizon services handled at the loader.
+- The NVN surface count of ~453 entry points in the audit is Splatoon 2-measured. The Splatoon 3 surface is to be verified in Gate 1.
+- Public static recompilation projects are title-specific, not generic. SplatNative follows that pattern: it targets Splatoon 3 specifically, not Switch games in general.
+
+## Contents
+
+- `GATE0_ARM_AUDIT.md` — Gate 0 audit. One cross-reference word in the original was changed in this repository copy to keep this repository free of other-project names; the original on the build PC is unchanged.
+- `sources.md` — every external source behind the audit's claims.
+- `ryujinx_boot_2026-10-30_1555.log` — copied emulator boot evidence log. No keys or game data are included.
+
+This folder is documentation only. No runtime code, no game files, no keys, and no firmware are included here.
