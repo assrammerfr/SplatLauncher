@@ -10,7 +10,7 @@ SplatNative is a title-specific static recompilation of Splatoon 3 (A64 to C to 
 | Gate 1 | Not passed |
 | Latest run | 2026-11-01 01:33 — init 438 of 6,858, stopping at `90763a0` (`dup` SIMD gap), no `nnMain`, no `GetService` |
 | Current work | Build-blocking SIMD emitter fixes: 9 classes across 56 failing translation units, ~2,291 errors (see the 2026-11-01 entries in the progress log). Midday source growth: a64.py 136,486 B (12:00), a64_ctx.h 89,777 B (12:27), PC CPU at 98-100% with Freebuff dominant at 14:10-14:25 |
-| Build state | No executable at last check (14:25) — the previous build failed with C2440 errors and did not link, and no new build has linked yet |
+| Build state | No executable at last check (14:35) — the previous build failed with C2440 errors and did not link, and no new build has linked yet |
 | Next step | Full regeneration, build, and run that clears the build errors and moves init past 438, with no `[unmapped]` on jump-table targets |
 
 ## Contents
@@ -104,3 +104,10 @@ No game files, no keys, no firmware, no titlekeys, no NSO bytes, and no decrypte
 - Sizes in git with this update: `src/recomp/a64.py` 82,107 B -> 135,621 B (09:05), `src/runtime/a64_ctx.h` 12,118 B -> 84,698 B (09:11). SIMD gap census reported by Freebuff: classes cleared 1,168 -> 90 total.
 - Still no new run: boot.log still 53,609 B (01:33 run, init 438, STOP 90763a0), gen.py still 26,426 B, exe still absent at last check. Evidence: evidence/c2440_simd_header_fix_2026-11-01.md.
 - Gate 1 still NOT passed — nnMain + GetService log still owed. Next step is a full regen + build + run that clears C2440 and gets init past 438, with no [unmapped] on jump-table targets.
+
+## Update 2026-11-01 14:35 CST — SIMD emitter work continues, no new run yet
+- The 09:11 view was incomplete: a full MSVC census after that fix found 4 translation units ok, 56 failing, ~2,291 errors, ~9 distinct root causes — not just the 5 defect classes mapped at 09:11. Current work is fixing those 9 build-blocker classes: fcvtzs/scvff signed suffix, faddp/fmaxp/fminp naming, fmul broadcast, shsub widths, frecpe/frsqrte/frint, sli/sri arguments, fabd floating-point, and the `__fm` redeclaration.
+- Source growth since 09:11, verified from disk on the PC: `src/recomp/a64.py` 135,621 B -> 136,486 B (12:00), `src/runtime/a64_ctx.h` 84,698 B -> 89,777 B (12:27). Sizes in git with this update match the PC at the 14:35 check.
+- Still no new run: boot.log still 53,609 B (01:33 run, init 438, STOP 90763a0), gen.py still 26,426 B, exe still absent at the 14:35 check. PC CPU was at 98-100% at 14:10-14:25 with Freebuff processes dominant, consistent with an in-progress regeneration/build, but no linked executable exists yet to judge.
+- Evidence: evidence/simd_header_growth_2026-11-01.md.
+- Gate 1 still NOT passed — nnMain + GetService log still owed. Next step is a full regen + build + run that clears the 9 classes and gets init past 438, with no [unmapped] on jump-table targets.
