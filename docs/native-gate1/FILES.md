@@ -1,11 +1,12 @@
 # SplatNative Gate 1 — What's In This Folder, and What's Built
 
-Snapshot as of the 2026-10-31 17:13 run. Sizes are from the PC, verified
+Snapshot as of the 2026-10-31 23:39 emitter edit (latest run still
+2026-10-31 18:30). Sizes are from the PC, verified
 from disk at push time. Generated outputs are listed so you can tell
 source from build artifact — generated outputs are NOT in git.
 
 ## Source — committed
-- `src/recomp/a64.py` (69,757 B) — A64 to C static recompiler.
+- `src/recomp/a64.py` (82,107 B at 23:39, was 69,757 B) — A64 to C static recompiler, now being extended for SIMD/FP emitter coverage.
 - `src/runtime/main.c` (8,381 B) — host runtime entry, ThreadManager
   sentinel seed, crash logging, fn table, init dispatch.
 - `src/runtime/nso_loader.c` (11,952 B) — NSO loader, owns REIr application.
@@ -21,6 +22,8 @@ source from build artifact — generated outputs are NOT in git.
 - `tools/scan_crossers.py` (4,326 B) — cross-range branch-target scan.
 - `tools/diag_ecccc.py` (3,965 B), `tools/diag_branch.py` (3,063 B),
   `tools/diag_e8aa.py` (3,409 B) — diagnostic tools for ecccc48 / e8aa4b4.
+- `tools/diag_9076.py` (2,520 B), `tools/diag_forms.py` (2,446 B),
+  `tools/census_forms.py` (4,503 B) — 90763a0 / SIMD-FP form diagnosis and census.
 - `tools/repair_main_shards.py` (2,780 B) — repair main shards deleted by race.
 
 ## Evidence — committed

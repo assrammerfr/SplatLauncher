@@ -66,12 +66,18 @@ class FnEmitter:
 
     @staticmethod
     def ridx(rn):
-        """Register name -> x[] index string (handles capstone fp/lr aliases)."""
+        """Register name -> x[]/d[] index string (handles capstone fp/lr aliases).
+        Vector registers may carry an arrangement suffix (v0.2d, v4.s); the
+        register number before the '.' is the index into c->d[]/c->dhi[].
+        Stripping it here keeps every caller from emitting a float subscript
+        like c->d[0.2d] (invalid C, observed as C2108/C2059 build failures)."""
         rn = rn.lower()
         if rn in FnEmitter.ALIAS:
             return FnEmitter.ALIAS[rn]
         if rn in ("sp",):
             return "31"
+        if "." in rn:
+            rn = rn.split(".", 1)[0]
         return rn[1:]
 
     @staticmethod
@@ -194,8 +200,12 @@ class FnEmitter:
             except Unsupported as e:
                 self.gaps.append((e.pc, e.word, e.mnemonic, e.why))
                 m = (e.mnemonic or "?").replace('"', "")
+                # a64_undef() already logs the pc and sets c->pc = A64_STOP.
+                # Do NOT overwrite c->pc with the undef-site address here: that
+                # re-dispatches a mid-function pc into fn_dispatch, which misses
+                # the table and fires a spurious [unmapped] (misreporting an
+                # emitter gap as a fn-table miss) and double-counts undef.
                 self.em(f"a64_undef(c, {e.pc:#x}u, {e.word:#x}u, \"{m}\");")
-                self.em(f"c->pc = {e.pc:#x}u;")
                 self.em("return;")
                 emitted_upto = e.pc
                 break
@@ -203,7 +213,6 @@ class FnEmitter:
                 self.gaps.append((i.address, struct.unpack("<I", i.bytes[:4])[0],
                                   i.mnemonic, f"emitter:{type(e).__name__}:{e}"))
                 self.em(f"a64_undef(c, {i.address:#x}u, {struct.unpack('<I', i.bytes[:4])[0]:#x}u, \"{i.mnemonic}\");")
-                self.em(f"c->pc = {i.address:#x}u;")
                 self.em("return;")
                 emitted_upto = i.address
                 break
@@ -218,7 +227,6 @@ class FnEmitter:
         # stalled or an undef stopped emission before reaching them)
         for lbl in sorted(self.labels - emitted_labels):
             self.em(f"L_{lbl:x}: a64_undef(c, {lbl:#x}u, 0, \"no_insn\");")
-            self.em(f"c->pc = {lbl:#x}u;")
             self.em("return;")
         return "\n".join(self.lines)
 
@@ -324,7 +332,8 @@ class FnEmitter:
                  "clrex", "sb", "esb", "psb", "tsb", "csdb", "hint",
                  "xpaclri", "xpaci", "xpacd", "bti",
                  "pacia1716", "autia1716", "pacib1716", "autib1716",
-                 "dc", "ic", "at", "tlbi"):
+                 "dc", "ic", "at", "tlbi",
+                 "stg", "stzg", "st2g", "stz2g"):
             # hints, barriers, cache/TLB maintenance, pointer-auth NOPs:
             # host memory is coherent and we implement no PAC/MTE, so these
             # are architecturally no-ops here.
@@ -338,6 +347,14 @@ class FnEmitter:
 
         # ---- move / arith aliases ----
         if m in ("mov", "movz", "movn", "movk"):
+            # vector/scalar-FP mov (ORR alias) must not fall into the GP mov
+            # path (it would write c->x[] from c->x[] of the vector numbers).
+            if m == "mov" and ops:
+                d0 = ops[0][1][:1]
+                s0 = ops[1][1][:1] if len(ops) > 1 else ""
+                if d0 in ("v", "q") or s0 in ("v", "q") or \
+                   (d0 in ("d", "s") and s0 in ("d", "s")):
+                    return self._simd(pc, m, ops, i)
             return self._mov(pc, m, ops)
         if m in ("adrp", "adr"):
             rd = ops[0][1]
@@ -347,13 +364,22 @@ class FnEmitter:
             self.put(self.wr(rd, expr))
             return
         if m in ("add", "adds", "sub", "subs", "cmp", "cmn", "neg", "negs"):
+            # vector add/sub/neg must not fall into the GP path (it would
+            # write c->x[vector-number]).
+            if m in ("add", "sub", "neg") and ops and ops[0][1][:1] in ("v", "q"):
+                return self._simd(pc, m, ops, i)
             return self._addsub(pc, m, ops)
         if m in ("and", "ands", "orr", "orn", "eor", "eon", "bic", "bics",
                  "tst", "teq", "mvn"):
+            if m in ("and", "orr", "orn", "eor", "bic", "mvn") and ops and \
+               ops[0][1][:1] in ("v", "q"):
+                return self._simd(pc, m, ops, i)
             return self._logical(pc, m, ops)
         if m in ("mul", "madd", "msub", "mneg", "smulh", "umulh",
                  "smull", "umull", "smaddl", "umaddl", "smsubl", "umsubl",
                  "smnegl", "umnegl"):
+            if m in ("smull", "umull", "mul") and ops and ops[0][1][:1] in ("v", "q"):
+                return self._simd(pc, m, ops, i)
             return self._mul(pc, m, ops)
         if m in ("udiv", "sdiv"):
             rd, rn, rm = ops[0][1], ops[1][1], ops[2][1]
@@ -406,7 +432,8 @@ class FnEmitter:
                  "stlxrb", "stlxrh", "ldar", "ldadd", "ldaddl", "ldset", "ldclr",
                  "ldeor", "swp", "swpl", "cas", "casa", "casal", "casl",
                  "ldaddal", "ldaddb", "ldaddh", "ldclrb", "ldclrh", "ldeorb",
-                 "ldeorh", "ldsetb", "ldseth"):
+                 "ldeorh", "ldsetb", "ldseth",
+                 "ldxp", "stxp", "ldaxp", "stlxp"):
             return self._atomic(pc, m, ops, i)
         if m.startswith(("ld1", "ld2", "ld3", "ld4", "st1", "st2", "st3", "st4", "ldnp", "stnp")):
             return self._simd_ldst(pc, m, ops, i)
@@ -419,7 +446,9 @@ class FnEmitter:
                  "frintz", "frinta", "frintx", "frinti", "fnm", "fms", "fmad", "fmia",
                  "fminp", "fmaxp", "fminnm", "fcvtas", "fcvtau", "fcvtms", "fcvtmu",
                  "fcvtns", "fcvtnu", "fcvtps", "fcvtpu", "frecpe", "frecps", "frsqrte",
-                 "fmulx", "fnmul", "fdivr" if False else "fdivr"):
+                 "fmulx", "fnmul", "faddp", "fmla", "fmls", "fcmeq", "fcmge",
+                 "fcmgt", "fcmle", "fcmlt", "fmaxnmv", "fminnmv", "frsqrts",
+                 "fdivr" if False else "fdivr"):
             return self._fp(pc, m, ops, i)
 
         # ---- SIMD immediate: movi vd.<arr>, #imm[, lsl #n] ----
@@ -463,11 +492,15 @@ class FnEmitter:
                  "sqshl", "uqshl", "sqshlu", "cnt", "not", "neg", "cmgt", "cmge", "cmeq",
                  "cmhi", "cmhs", "cmtst", "addp", "saddlp", "uaddlp", "saddlv", "uaddlv",
                  "smaxp", "umaxp", "sminp", "uminp", "smax", "umax", "smin", "umin",
+                 "cmge", "cmhs", "shadd", "shsub", "uhadd", "uhsub", "urhadd",
+                 "sqdmulh", "sqrdmulh", "aese", "aesd", "aesimc",
                  "fadd", "fsub", "fmul", "fdiv", "fmax", "fmin", "fabd", "fabe",
                  "scvtf", "ucvtf", "fcvtzs", "fcvtzu", "sqxtn", "uqxtn", "sqxtun",
                  "sxtl", "sxtl2", "uxtl", "uxtl2", "shll", "shll2",
                  "pmull", "pmull2", "pmul", "uadalp", "sadalp", "uaddw", "saddw",
-                 "usubw", "ssubw", "sadalp"):
+                 "usubw", "ssubw", "sadalp",
+                 "ushll", "ushll2", "sshll", "sshll2",                 "xtn", "shrn", "sqshrn", "sqrshrn", "smull", "umull", "smull2", "umull2", "smlal",
+                 "smlal2", "umlal", "umlal2", "addv", "umaxv", "bif", "bit", "bsl", "mvni", "mvn"):
             return self._simd(pc, m, ops, i)
 
         if m in ("ngc", "ngcs"):
@@ -492,8 +525,8 @@ class FnEmitter:
         if m in ("clz", "cls", "rbit", "rev", "rev16", "rev32", "rev64"):
             rd, rn = ops[0][1], ops[1][1]
             if rd.startswith("v"):
-                # vector form: SIMD rev* is not implemented yet, fail honestly
-                raise Unsupported(pc, word, f"simd '{m}'", m)
+                # vector CLZ/REV: byte-wise helpers in a64_ctx.h
+                return self._simd(pc, m, ops, i)
             w = self.is_w(rd)
             bits = 32 if w else 64
             if m == "clz":
@@ -909,9 +942,14 @@ class FnEmitter:
                 return
             if m in ("smnegl", "umnegl"):
                 rn, rm = ops[1][1], ops[2][1]
-                sgn = "int" if m == "smnegl" else "uint"
-                expr = f"(-(({sgn}64_t)({'' if m=='smnegl' else 'u'}{'' }"
-                raise Unsupported(pc, 0, m, m)
+                if m == "smnegl":
+                    expr = (f"(-(int64_t)((int64_t)(int32_t){self.rd(rn, True)} * "
+                            f"(int64_t)(int32_t){self.rd(rm, True)}))")
+                else:
+                    expr = (f"(-(uint64_t)((uint64_t)(uint32_t){self.rd(rn, True)} * "
+                            f"(uint64_t)(uint32_t){self.rd(rm, True)}))")
+                self.put(self.wr(rd, expr))
+                return
             rn, rm, ra = ops[1][1], ops[2][1], ops[3][1]
             if m == "smaddl":
                 expr = f"(c->x[{self.ridx(ra)}] + (int64_t)(int32_t){self.rd(rn, True)} * (int64_t)(int32_t){self.rd(rm, True)})"
@@ -1134,6 +1172,20 @@ class FnEmitter:
             esz = None  # default by rt/operand width below
         # operands: rt, [base{, index} {, #imm}] {, #imm(post/pre)}
         rt = ops[0][1]
+        if rt[:1] in ("q", "d", "s"):
+            # SIMD/FP register transfer (incl. literal form)
+            load0 = m.startswith("ld")
+            mem0 = ops[1]
+            self._cur_insn = i
+            if mem0[0] == "mem":
+                addr0 = self._mem_expr(mem0[1], i, ops)
+                mm0 = mem0[1]
+            elif mem0[0] in ("imm", "fp") and load0:
+                addr0 = f"{int(mem0[1]) & ((1 << 64) - 1):#x}ull"
+                mm0 = None
+            else:
+                raise Unsupported(pc, 0, "vec ldst non-mem", m)
+            return self._vec_ldst(pc, m, ops, i, load0, addr0, mm0)
         w_rt = self.is_w(rt)
         if esz is None:
             esz = 64 if not w_rt and m not in ("ldrsb", "ldrsh") else 32
@@ -1142,12 +1194,18 @@ class FnEmitter:
             if w_rt and load and m in ("ldr", "ldur"):
                 esz = 32
         mem = ops[1]
-        if mem[0] != "mem":
+        if mem[0] != "mem" and not (load and mem[0] in ("imm", "fp")):
             raise Unsupported(pc, 0, "ldst non-mem", m)
-        mm = mem[1]
         self._cur_insn = i
-        base = self.rd(i.reg_name(mm.base), False)
-        addr = self._mem_expr(mm, i, ops)
+        if mem[0] == "mem":
+            mm = mem[1]
+            base = self.rd(i.reg_name(mm.base), False)
+            addr = self._mem_expr(mm, i, ops)
+        else:
+            # GP literal: ldr wt/xt, #label (address resolved by capstone)
+            mm = None
+            base = "0ull"
+            addr = f"{int(mem[1]) & ((1 << 64) - 1):#x}ull"
         # post/pre index: extra imm operand (3rd token) — detect via raw operand count
         # capstone: for [x0, #8]!  the writeback is implied; op_str ends with '!'
         post = i.op_str.endswith("]")  and len(ops) == 3 and ops[2][0] == "imm"
@@ -1181,11 +1239,12 @@ class FnEmitter:
             val = self.rd(rt, w_rt) if rt.lower() not in ("wzr", "xzr") else ("0u" if w_rt else "0ull")
             self.em(f"st{esz}(c, {addr}, {val if esz >= 32 else f'(uint{esz}_t)({val})'});")
         # writeback
-        bname = i.reg_name(mm.base)
-        if i.op_str.rstrip().endswith("]!"):
-            self.em(f"c->x[{self.ridx(bname)}] = {addr};")  # pre-index: new base = addr
-        elif ", [" in i.op_str and "], #" in i.op_str and raw_imm is not None:
-            self.em(f"c->x[{self.ridx(bname)}] = ({base} + ({raw_imm}));")
+        if mm is not None:
+            bname = i.reg_name(mm.base)
+            if i.op_str.rstrip().endswith("]!"):
+                self.em(f"c->x[{self.ridx(bname)}] = {addr};")  # pre-index: new base = addr
+            elif ", [" in i.op_str and "], #" in i.op_str and raw_imm is not None:
+                self.em(f"c->x[{self.ridx(bname)}] = ({base} + ({raw_imm}));")
 
     def _mem_expr(self, mm, i, ops):
         base = self.rd(i.reg_name(mm.base), False)
@@ -1248,6 +1307,13 @@ class FnEmitter:
         is_lse = m.startswith(("ldadd", "ldclr", "ldeor", "ldset", "swp"))
         if not is_lse and not m.startswith("cas"):
             if m.startswith("ld"):
+                if m in ("ldxp", "ldaxp") and len(ops) == 3:
+                    # load-pair: rt, rt2, [xn] -> two consecutive 64-bit loads
+                    rt, rt2, mem = ops[0][1], ops[1][1], ops[2][1]
+                    addr = self._mem_expr(mem, i, ops)
+                    self.put(self.wr(rt, f"ld64(c, {addr})", False))
+                    self.put(self.wr(rt2, f"ld64(c, ({addr} + 8))", False))
+                    return
                 rt = ops[0][1]
                 addr = self._mem_expr(ops[1][1], i, ops)
                 w = self.is_w(rt)
@@ -1262,6 +1328,14 @@ class FnEmitter:
                 self.put(self.wr(rt, expr, w))
                 return
             # store: [rt, mem] or exclusive [ws, rt, mem]
+            if m in ("stxp", "stlxp") and len(ops) == 4:
+                # store-pair: rs, rt, rt2, [xn]
+                rs, rt, rt2, mem = ops[0][1], ops[1][1], ops[2][1], ops[3][1]
+                addr = self._mem_expr(mem, i, ops)
+                self.em(f"st64(c, {addr}, {self.rd(rt, False)});")
+                self.em(f"st64(c, ({addr} + 8), {self.rd(rt2, False)});")
+                self.put(self.wr(rs, "0ull", True))
+                return
             if len(ops) == 3:
                 ws, rt, mem = ops[0][1], ops[1][1], ops[2][1]
             else:
@@ -1332,7 +1406,140 @@ class FnEmitter:
         raise Unsupported(pc, 0, m, m)
 
     def _simd_ldst(self, pc, m, ops, i):
-        raise Unsupported(pc, 0, "simd ldst", m)
+        # ld1..ld4 / st1..st4 / ld1r..ld4r register-list forms.
+        # op_str: "ld1 {v0.16b, v1.16b}, [x0, #16]" / "ld1 {v0.16b}, [x0], #16"
+        import re as _re
+        s = i.op_str
+        lm = _re.search(r"\{([^}]*)\}", s)
+        if not lm:
+            raise Unsupported(pc, 0, "simd ldst no list", m)
+        regs = [t.strip() for t in lm.group(1).split(",") if t.strip()]
+        if not regs:
+            raise Unsupported(pc, 0, "simd ldst empty", m)
+        memop = next((o for o in ops if o[0] == "mem"), None)
+        if memop is None:
+            raise Unsupported(pc, 0, "simd ldst non-mem", m)
+        self._cur_insn = i
+        addr = self._mem_expr(memop[1], i, ops)
+        bname = i.reg_name(memop[1].base)
+        base = self.rd(bname, False)
+        first = regs[0]
+        if "." not in first:
+            raise Unsupported(pc, 0, "simd ldst arr", m)
+        arr = first.split(".", 1)[1].strip().rstrip("}! ")
+        esz = {"b": 1, "h": 2, "s": 4, "d": 8}.get(arr[-1:])
+        nlanes = int(arr[:-1]) if arr[:-1].isdigit() else 1
+        if esz is None or nlanes < 1 or nlanes * esz > 16:
+            raise Unsupported(pc, 0, f"simd ldst arr '{arr}'", m)
+        bpr = nlanes * esz                 # bytes loaded per register
+        nregs = len(regs)
+        is_load = m.startswith("ld")
+        rep = m.endswith("r")
+        kind = int(m[2]) if m[2].isdigit() else 1   # 1..4
+        if rep and not is_load:
+            raise Unsupported(pc, 0, "simd ldst st_r", m)
+
+        def qwrite(ridx, src, bpr_):
+            if bpr_ == 16:
+                self.em(f"c->d[{ridx}] = {src}.lo; c->dhi[{ridx}] = {src}.hi;")
+            elif bpr_ == 8:
+                self.em(f"c->d[{ridx}] = {src}.lo;")
+            else:
+                self.em(f"c->d[{ridx}] = (c->d[{ridx}] & ~0xffffffffull) | (uint64_t)(uint32_t)({src}.lo);")
+
+        def ldreg(ridx, aexpr, bpr_):
+            if bpr_ == 16:
+                self.em(f"c->d[{ridx}] = ld64(c, {aexpr}); c->dhi[{ridx}] = ld64(c, ({aexpr} + 8));")
+            elif bpr_ == 8:
+                self.em(f"c->d[{ridx}] = ld64(c, {aexpr});")
+            else:
+                self.em(f"c->d[{ridx}] = (c->d[{ridx}] & ~0xffffffffull) | "
+                        f"(uint64_t)(uint32_t)ld32(c, {aexpr});")
+
+        def streg(ridx, aexpr, bpr_):
+            if bpr_ == 16:
+                self.em(f"st64(c, {aexpr}, c->d[{ridx}]); st64(c, ({aexpr} + 8), c->dhi[{ridx}]);")
+            elif bpr_ == 8:
+                self.em(f"st64(c, {aexpr}, c->d[{ridx}]);")
+            else:
+                self.em(f"st32(c, {aexpr}, (uint32_t)c->d[{ridx}]);")
+
+        ldfn = {1: "ld8", 2: "ld16", 4: "ld32", 8: "ld64"}[esz]
+        stfn = {1: "st8", 2: "st16", 4: "st32", 8: "st64"}[esz]
+
+        for k, rg in enumerate(regs):
+            ridx = self.ridx(rg)
+            if rep:
+                # load one element at addr + k*esz, replicate across lanes
+                ea = f"({addr} + {k * esz})"
+                self.em("{ V128 __r; uint64_t __e; int __j;")
+                self.em(f"  __e = {ldfn}(c, {ea});")
+                self.em("  __r.lo = 0; __r.hi = 0;")
+                self.em(f"  for (__j = 0; __j < {nlanes}; __j++) "
+                        f"memcpy((char*)&__r + __j * {esz}, &__e, {esz});")
+                qwrite(ridx, "__r", bpr)
+                self.em("}")
+            elif kind == 1:
+                a = f"({addr} + {k * bpr})"
+                if is_load:
+                    ldreg(ridx, a, bpr)
+                else:
+                    streg(ridx, a, bpr)
+            else:
+                # interleaved: element j of reg k at addr + (j*nregs + k)*esz
+                self.em("{ V128 __r; int __j; __r.lo = 0; __r.hi = 0;")
+                if is_load:
+                    self.em(f"  for (__j = 0; __j < {nlanes}; __j++) {{ uint64_t __e = "
+                            f"{ldfn}(c, ({addr} + (__j * {nregs} + {k}) * {esz})); "
+                            f"memcpy((char*)&__r + __j * {esz}, &__e, {esz}); }}")
+                    qwrite(ridx, "__r", bpr)
+                else:
+                    self.em(f"  __r.lo = c->d[{ridx}]; __r.hi = c->dhi[{ridx}];")
+                    self.em(f"  for (__j = 0; __j < {nlanes}; __j++) {{ uint64_t __e = 0; "
+                            f"memcpy(&__e, (const char*)&__r + __j * {esz}, {esz}); "
+                            f"{stfn}(c, ({addr} + (__j * {nregs} + {k}) * {esz}), __e); }}")
+                self.em("}")
+
+        # writeback: pre-index "[x, #n]!" or post-index "[x], #n"
+        if s.rstrip().endswith("]!"):
+            self.em(f"c->x[{self.ridx(bname)}] = {addr};")
+        else:
+            pm = _re.search(r"\],\s*#(-?\d+)", s)
+            if pm:
+                self.em(f"c->x[{self.ridx(bname)}] = ({base} + ({int(pm.group(1))}));")
+
+    def _vec_ldst(self, pc, m, ops, i, load, addr, mm):
+        """LDR/STR of s/d/q registers (and literal forms)."""
+        rt = ops[0][1]
+        idx = self.ridx(rt)
+        cls = rt[0]
+        if cls == "q":
+            if load:
+                self.em(f"c->d[{idx}] = ld64(c, {addr});")
+                self.em(f"c->dhi[{idx}] = ld64(c, ({addr} + 8));")
+            else:
+                self.em(f"st64(c, {addr}, c->d[{idx}]);")
+                self.em(f"st64(c, ({addr} + 8), c->dhi[{idx}]);")
+        elif cls == "d":
+            if load:
+                self.em(f"c->d[{idx}] = ld64(c, {addr});")
+            else:
+                self.em(f"st64(c, {addr}, c->d[{idx}]);")
+        else:  # s: low 32 bits, upper bits of the register unchanged
+            if load:
+                self.em(f"c->d[{idx}] = (c->d[{idx}] & ~0xffffffffull) | "
+                        f"(uint64_t)(uint32_t)ld32(c, {addr});")
+            else:
+                self.em(f"st32(c, {addr}, (uint32_t)c->d[{idx}]);")
+        if mm is not None:
+            bname = i.reg_name(mm.base)
+            base = self.rd(bname, False)
+            if i.op_str.rstrip().endswith("]!"):
+                self.em(f"c->x[{self.ridx(bname)}] = {addr};")
+            elif ", [" in i.op_str and "], #" in i.op_str:
+                raw = [o[1] for o in ops if o[0] == "imm"]
+                if raw:
+                    self.em(f"c->x[{self.ridx(bname)}] = ({base} + ({int(raw[0])}));")
 
     # =============== FP ===============
     def _fp(self, pc, m, ops, i):
@@ -1340,6 +1547,15 @@ class FnEmitter:
         # scalar vs vector decided by register name (d/s/h/q)
         rclass = rd[0]
         if rclass in ("q", "v") or (len(ops) > 1 and ops[1][0] == "reg" and ops[1][1][0] in ("q", "v")):
+            return self._fpvec(pc, m, ops, i)
+        # vector-int<->fp conversions print BOTH operands in d/s classes even
+        # though the op is the .2D/.4S lane-wise form (verified vs Unicorn:
+        # fcvtzs d1, d1 writes V1 with per-lane ints, not X1).  A GPR-dest
+        # scalar conversion always prints x/w as the destination.
+        if m in ("fcvtzs", "fcvtzu", "scvtf", "ucvtf", "fcvtas", "fcvtau",
+                 "fcvtms", "fcvtmu", "fcvtns", "fcvtnu", "fcvtps", "fcvtpu") \
+           and rclass in ("d", "s") and len(ops) > 1 and ops[1][0] == "reg" \
+           and ops[1][1][0] in ("d", "s"):
             return self._fpvec(pc, m, ops, i)
 
         def f64v(tok):
@@ -1529,6 +1745,28 @@ class FnEmitter:
             return
         if m in ("frecpe", "frsqrte", "frecps", "frsqrts"):
             raise Unsupported(pc, 0, m, m)
+        if m in ("fmla", "fmls") and len(ops) == 3:
+            # scalar FMLA/FMLS Vd, Vn, Vm: Vd = Vn*Vm (+-) Vd
+            rn, rm = ops[1][1], ops[2][1]
+            if rd[0] == "s":
+                fn = "a64_fmadd_32" if m == "fmla" else "a64_fmsub_32"
+                a, b, c = f"u32f(c->d[{rn[1:]}])", f"u32f(c->d[{rm[1:]}])", f"u32f(c->d[{rd[1:]}])"
+                store32(rd, f"{fn}({a}, {b}, {c})")
+            else:
+                fn = "a64_fmadd_64" if m == "fmla" else "a64_fmsub_64"
+                a, b, c = f"u64f(c->d[{rn[1:]}])", f"u64f(c->d[{rm[1:]}])", f"u64f(c->d[{rd[1:]}])"
+                store64(rd, f"{fn}({a}, {b}, {c})")
+            return
+        if m in ("fmad", "fms") and len(ops) == 4:
+            # FMAD/FMS Dd, Dn, Dm, Da: Dd = Dn*Dm (+/-) Da
+            rn, rm, ra = ops[1][1], ops[2][1], ops[3][1]
+            if rd[0] == "s":
+                fn = "a64_fmadd_32" if m == "fmad" else "a64_fmsub_32"
+                store32(rd, f"{fn}(u32f(c->d[{rn[1:]}]), u32f(c->d[{rm[1:]}]), u32f(c->d[{ra[1:]}]))")
+            else:
+                fn = "a64_fmadd_64" if m == "fmad" else "a64_fmsub_64"
+                store64(rd, f"{fn}(u64f(c->d[{rn[1:]}]), u64f(c->d[{rm[1:]}]), u64f(c->d[{ra[1:]}]))")
+            return
         raise Unsupported(pc, 0, f"fp '{m}'", m)
 
     def _fpvec(self, pc, m, ops, i):

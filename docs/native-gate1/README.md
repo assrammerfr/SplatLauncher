@@ -73,3 +73,10 @@ No game files, no keys, no firmware in this folder. No launcher code changed.
 - gen.py 24,851 -> 26,426 B (17:31), gen_report.json 7,949 -> 8,047 B (17:46). Evidence: evidence/e8aa4b4_fix_1830_run_2026-10-31.md. Generated recomp_meta.c (28,839,782 B) NOT uploaded.
 - This run met the Freebuff V4 build watch stop condition (new STOP with init past 17). Watch reported once and is done; removal is Seth's call.
 - Gate 1 still NOT passed — nnMain + GetService log still owed.
+
+## Update 2026-10-31 23:39 CST — emitter coverage work, no new run yet
+- Blocker class after 18:30: emitter instruction coverage, not missing-function discovery. STOP 90763a0 is `dup v0.2s, w9` (NEON SIMD) — the emitter hit an unsupported mnemonic, emitted `a64_undef`, and mid-function resume dispatched to nothing. Quantified from the 18:30 run: ~75 SIMD/FP mnemonics, 14,917 sites (fsub x3,860, fmul x2,778, dup x1,850 total sites), init 438 of 6,858 (6.4%).
+- Freebuff is now editing the emitter itself: `src/recomp/a64.py` 69,757 B -> 81,494 B at 21:39, then 82,107 B at 23:39 (+12,350 B total). This push snapshots the 23:39 a64.py; it was still being edited at push time, so a later edit may supersede it before the next run.
+- New tools in git with this update: `tools/diag_9076.py` (2,520 B, 18:39) — 90763a0 diagnosis; `tools/diag_forms.py` (2,446 B, 20:20); `tools/census_forms.py` (4,503 B, 21:45) — census of SIMD/FP forms/sites.
+- No new run: gen.py unchanged 26,426 B (17:31), boot.log unchanged 73,548 B (18:30), exe unchanged 406,729,216 B (18:30), init 438, STOP still 90763a0, svc_count 0, no nnMain, no GetService.
+- Gate 1 still NOT passed — nnMain + GetService log still owed. Next step to watch for is a regen + rebuild + re-run from the new a64.py.
