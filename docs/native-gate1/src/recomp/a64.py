@@ -56,6 +56,7 @@ class FnEmitter:
         self.lines = []
         self.gaps = []          # (pc, word, mnemonic, why)
         self.used_helpers = set()
+        self._tmp = 0           # unique suffix for per-insn temporaries
 
     # ---------- output ----------
     def em(self, s):
@@ -113,6 +114,135 @@ class FnEmitter:
     def put(self, stmts):
         for s in stmts:
             self.em(s)
+
+    # ---------- vector emit primitives ----------
+    # V128 lane layout helpers for the a64_ctx.h vector library.
+    # Every vector form resolves to: load source V128s from c->d[]/c->dhi[],
+    # call one v_* helper, store the result back.  Sub-128-bit arrangements
+    # (.2s/.4h/.8b) write only the low half; the high 64 bits of the register
+    # are preserved (UNPREDICTABLE upstream, so keeping the old value matches
+    # hardware rather than zeroing).
+    ARR_ESZ = {"b": 1, "h": 2, "s": 4, "d": 8}
+
+    @staticmethod
+    def _arr_parts(arr):
+        """'4s' -> (4, 4).  Returns (lanes, esz_bytes); None if unknown."""
+        arr = arr.lower()
+        if len(arr) < 2:
+            return None
+        n = arr[:-1]
+        es = FnEmitter.ARR_ESZ.get(arr[-1])
+        if not n.isdigit() or es is None:
+            return None
+        n = int(n)
+        if n < 1 or n * es > 16:
+            return None
+        return n, es
+
+    @staticmethod
+    def _lane_suffix(esz):
+        """esz bytes -> the a64_ctx.h lane suffix (u8/u16/u32/u64)."""
+        return {1: "u8", 2: "u16", 4: "u32", 8: "u64"}[esz]
+
+    @staticmethod
+    def _fp_suffix(esz):
+        return {4: "f32", 8: "f64"}.get(esz)
+
+    def _newtmp(self, n=4):
+        self._tmp += 1
+        return [f"__t{self._tmp}_{k}" for k in range(n)]
+
+    def _vld(self, t, reg):
+        """Emit V128 load of a vector register -> temp name t."""
+        idx = self.ridx(reg)
+        self.em(f"V128 {t} = vld128(c, {idx});")
+        return t
+
+    def _vst(self, reg, t, esz, lanes):
+        """Store temp t back to a vector register honouring sub-128 width."""
+        idx = self.ridx(reg)
+        if lanes * esz >= 16:
+            self.em(f"vst128(c, {idx}, {t});")
+        elif lanes * esz == 8:
+            self.em(f"c->d[{idx}] = {t}.lo;")
+        else:  # 1..4 bytes: keep upper bits of the low 64
+            mask = ((1 << (lanes * esz)) - 1)
+            self.em(f"c->d[{idx}] = (c->d[{idx}] & ~{mask:#x}ull) | "
+                    f"({t}.lo & {mask:#x}ull);")
+
+    def _vzero(self, t):
+        self.em(f"V128 {t}; {t}.lo = 0; {t}.hi = 0;")
+        return t
+
+    def _vimm(self, t, val, esz, lanes):
+        """Emit a V128 broadcast of a scalar immediate across lanes."""
+        lane_bits = esz * 8
+        lane = val & ((1 << lane_bits) - 1)
+        rep = sum(lane << (lane_bits * k) for k in range(64 // lane_bits))
+        self.em(f"V128 {t}; {t}.lo = {rep:#x}ull; "
+                f"{t}.hi = {rep:#x}ull;")
+        return t
+
+    def _vparse(self, i, ops):
+        """Parse a vector instruction into (arr, rd, src_toks, imms).
+
+        src_toks are ('v', 'v3') / ('elem', 'v3', esz_char, idx) /
+        ('gpr', 'w9') / ('imm', int) / ('fp', float) / ('list', [regs]).
+        Operands are taken from capstone's structured ops where possible and
+        refined from op_str where the arrangement/element index matters.
+        """
+        import re as _re
+        s = i.op_str
+        # destination arrangement comes from op_str (capstone drops it from
+        # ops[0] for most SIMD forms)
+        head = s.split(",")[0].strip()
+        arr = head.split(".")[1] if "." in head else "2d"
+        arr = arr.split("[")[0].strip()
+        rd = ops[0][1] if ops else ""
+        toks = []
+        # include ops[0] so element destinations (mov vd.d[1], …) are visible
+        for kind, val in ops:
+            if kind == "reg":
+                r = val.lower() if val else ""
+                if not r:
+                    continue
+                if r[:1] in ("v", "q"):
+                    esz_c = None
+                    em3 = _re.search(rf"{r}\.([bhsd])\[(\d+)\]", s)
+                    if em3:
+                        esz_c, eidx = em3.group(1), int(em3.group(2))
+                        toks.append(("elem", r, esz_c, eidx))
+                    else:
+                        toks.append(("v", r))
+                elif r[:1] in ("d", "s", "h", "b", "w", "x"):
+                    toks.append(("gpr", r))
+                else:
+                    toks.append(("reg", r))
+            elif kind == "imm":
+                toks.append(("imm", int(val)))
+            elif kind == "fp":
+                toks.append(("fp", float(val)))
+            elif kind == "mem":
+                toks.append(("mem", val))
+            else:
+                toks.append((kind, val))
+        return arr, rd, toks
+
+    def _helper1(self, fn, rd, a, esz, lanes):
+        """rd = fn(a)"""
+        t = self._newtmp(1)[0]
+        self.em(f"V128 {t} = {fn}({a});")
+        self._vst(rd, t, esz, lanes)
+
+    def _helper2(self, fn, rd, a, b, esz, lanes):
+        t = self._newtmp(1)[0]
+        self.em(f"V128 {t} = {fn}({a}, {b});")
+        self._vst(rd, t, esz, lanes)
+
+    def _helper3(self, fn, rd, a, b, cc, esz, lanes):
+        t = self._newtmp(1)[0]
+        self.em(f"V128 {t} = {fn}({a}, {b}, {cc});")
+        self._vst(rd, t, esz, lanes)
 
     def branch_to(self, target, is_known_fn):
         """Emit a taken branch to `target` (no fallthrough)."""
@@ -349,9 +479,12 @@ class FnEmitter:
         if m in ("mov", "movz", "movn", "movk"):
             # vector/scalar-FP mov (ORR alias) must not fall into the GP mov
             # path (it would write c->x[] from c->x[] of the vector numbers).
+            # Only inspect operand 1 when it is a register: for an immediate
+            # (mov w9,#1) ops[1][1] is an int, and slicing it raised TypeError,
+            # turning every scalar reg-imm move into a gap (stopped init at #1).
             if m == "mov" and ops:
                 d0 = ops[0][1][:1]
-                s0 = ops[1][1][:1] if len(ops) > 1 else ""
+                s0 = ops[1][1][:1] if len(ops) > 1 and ops[1][0] == "reg" else ""
                 if d0 in ("v", "q") or s0 in ("v", "q") or \
                    (d0 in ("d", "s") and s0 in ("d", "s")):
                     return self._simd(pc, m, ops, i)
@@ -419,7 +552,7 @@ class FnEmitter:
         # ---- loads / stores ----
         if m in ("ldr", "ldrb", "ldrh", "ldrsb", "ldrsh", "ldrsw", "ldur", "ldurb",
                  "ldurh", "ldursb", "ldursh", "ldursw", "str", "strb", "strh",
-                 "stur", "sturb", "sturh", "prfm"):
+                 "stur", "sturb", "sturh", "prfm", "prfum"):
             return self._ldst(pc, m, ops, i)
         if m in ("ldp", "ldpsw", "stp"):
             return self._ldstp(pc, m, ops, i)
@@ -490,6 +623,7 @@ class FnEmitter:
                  "add", "sub", "sqadd", "uqadd", "sqsub", "uqsub", "mul", "mla", "mls",
                  "shl", "ushl", "sshl", "ushr", "sshr", "srshr", "sqrshl", "uqrshl",
                  "sqshl", "uqshl", "sqshlu", "cnt", "not", "neg", "cmgt", "cmge", "cmeq",
+                 "cmlt", "cmle", "abs", "sqabs", "sqneg", "fsqrt", "frecpe", "frsqrte",
                  "cmhi", "cmhs", "cmtst", "addp", "saddlp", "uaddlp", "saddlv", "uaddlv",
                  "smaxp", "umaxp", "sminp", "uminp", "smax", "umax", "smin", "umin",
                  "cmge", "cmhs", "shadd", "shsub", "uhadd", "uhsub", "urhadd",
@@ -500,7 +634,9 @@ class FnEmitter:
                  "pmull", "pmull2", "pmul", "uadalp", "sadalp", "uaddw", "saddw",
                  "usubw", "ssubw", "sadalp",
                  "ushll", "ushll2", "sshll", "sshll2",                 "xtn", "shrn", "sqshrn", "sqrshrn", "smull", "umull", "smull2", "umull2", "smlal",
-                 "smlal2", "umlal", "umlal2", "addv", "umaxv", "bif", "bit", "bsl", "mvni", "mvn"):
+                 "smlal2", "umlal", "umlal2",                 "addv", "umaxv", "smaxv", "sminv", "uminv", "sli", "sri",
+                 "ssra", "ursra", "srsra", "usra", "bif", "bit", "bsl",
+                 "mvni", "mvn"):
             return self._simd(pc, m, ops, i)
 
         if m in ("ngc", "ngcs"):
@@ -1552,7 +1688,17 @@ class FnEmitter:
         # though the op is the .2D/.4S lane-wise form (verified vs Unicorn:
         # fcvtzs d1, d1 writes V1 with per-lane ints, not X1).  A GPR-dest
         # scalar conversion always prints x/w as the destination.
-        if m in ("fcvtzs", "fcvtzu", "scvtf", "ucvtf", "fcvtas", "fcvtau",
+        #
+        # There is no scalar form of these that keeps d/s on BOTH sides: the
+        # d/s-to-d/s spelling is always the lane-wise vector op, so it must
+        # reach _fpvec (where the arrangement in op_str decides lane count).
+        # An h operand is scalar and is caught by the scalar paths below.
+        #
+        # scvtf/ucvtf are the exception and stay OUT of this hijack: their
+        # d/s-to-d/s spelling is the SCALAR form (SCVTF Sd,Sn / Dd,Dn) with
+        # the int in the FP reg's low bits and upper lanes zeroed (verified
+        # vs Unicorn).  They are handled in the scalar branch below.
+        if m in ("fcvtzs", "fcvtzu", "fcvtas", "fcvtau",
                  "fcvtms", "fcvtmu", "fcvtns", "fcvtnu", "fcvtps", "fcvtpu") \
            and rclass in ("d", "s") and len(ops) > 1 and ops[1][0] == "reg" \
            and ops[1][1][0] in ("d", "s"):
@@ -1726,9 +1872,25 @@ class FnEmitter:
             return
         if m in ("scvtf", "ucvtf"):
             src = ops[1][1]
+            f = "a64_i2f_s" if m == "scvtf" else "a64_i2f_u"
+            if src[0] in ("d", "s"):
+                # SCALAR FP-register source (SCVTF/UCVTF Sd,Sn / Dd,Dn): the
+                # int sits in the FP reg's low 32 (s) / 64 (d) bits, the
+                # result is written to lane0, and the upper lanes are
+                # zeroed.  Verified vs Unicorn: scvtf s1,s1 of int32
+                # 0x80000000 -> lane0=0xcf000000, bits[127:32]=0 (ucvtf ->
+                # 0x4f000000); scvtf d1,d1 of int64 0x2_00000005 ->
+                # 4294967301.0 (full 64-bit read), bits[127:64]=0.
+                ib = 32 if src[0] == "s" else 64
+                arg = f"(uint32_t)c->d[{src[1:]}]" if ib == 32 else f"c->d[{src[1:]}]"
+                if rd[0] == "s":
+                    store32(rd, f"(float)({f}(32, {ib}, {arg}))")
+                else:
+                    store64(rd, f"(double)({f}(64, {ib}, {arg}))")
+                self.em(f"c->dhi[{rd[1:]}] = 0;")
+                return
             dst_s = rd[0] == "s"
             w = self.is_w(src)
-            f = "a64_i2f_s" if m == "scvtf" else "a64_i2f_u"
             expr = f"{f}({'32' if dst_s else '64'}, {'32' if w else '64'}, {self.rd(src, w)})"
             if dst_s:
                 store32(rd, f"(float)({expr})")
@@ -1770,11 +1932,961 @@ class FnEmitter:
         raise Unsupported(pc, 0, f"fp '{m}'", m)
 
     def _fpvec(self, pc, m, ops, i):
-        raise Unsupported(pc, 0, f"fp vector '{m}'", m)
+        """Advanced-SIMD floating-point vector forms.
+
+        Reached when the destination or a source is a v/q register.  Integer
+        SIMD goes to _simd; FP vector arithmetic, comparisons, conversions,
+        reductions and pairwise ops land here.
+        """
+        return self._vector(pc, m, ops, i, fp=True)
 
     # =============== SIMD ===============
     def _simd(self, pc, m, ops, i):
-        raise Unsupported(pc, 0, f"simd '{m}'", m)
+        return self._vector(pc, m, ops, i, fp=False)
+
+    # ------------------------------------------------------------------
+    # shared vector dispatcher
+    # ------------------------------------------------------------------
+    def _vector(self, pc, m, ops, i, fp):
+        """Single dispatcher for every Advanced-SIMD vector form.
+
+        Sub-dispatch by shape: 3-operand lane ops, shift-by-immediate,
+        permutes, widening/narrowing, element moves, reductions, pairwise,
+        crypto, table lookup, immediate broadcast.
+        """
+        arr, rd, toks = self._vparse(i, ops)
+        if "." not in i.op_str.split(",")[0]:
+            # capstone drops the destination arrangement when the dest
+            # prints as the low lane of a vector register.  Recover it from
+            # a source operand (sminv s1, v1.4s) or, for the int<->fp
+            # conversions, from the dest class (fcvtzs s1, s0 is the .4S
+            # vector form; a scalar fcvtzs with an FP dest does not exist).
+            import re as _re
+            sm = _re.search(r"\.(16b|8b|4s|2s|8h|4h|2d|1d)\b", i.op_str)
+            if sm:
+                arr = sm.group(1)
+            elif rd[:1] in ("s", "d") and m in ("fcvtzs", "fcvtzu", "scvtf", "ucvtf"):
+                arr = "4s" if rd[0] == "s" else "2d"
+        parts = self._arr_parts(arr)
+        if parts is None:
+            # some forms (umov/smov/dup from GPR) print the dest without an
+            # arrangement in op_str; derive from the register class instead
+            parts = self._arr_parts(self._guess_arr(rd, toks))
+            arr = self._guess_arr(rd, toks)
+        if parts is None:
+            raise Unsupported(pc, 0, f"vec arr '{arr}' for '{m}'", m)
+        lanes, esz = parts
+
+        # ---- element moves: umov / smov / mov-elem / ins / fmov-elem ----
+        if m in ("umov", "smov"):
+            return self._vec_umov(pc, m, rd, toks, esz, lanes, arr, sign=(m == "smov"))
+        if m == "mov":
+            d_elem = next((t for t in toks if t[0] == "elem" and t[1] == rd), None)
+            if rd[:1] in ("w", "x"):
+                # mov wd, vn.s[1] == umov (zero-extend element to GPR)
+                return self._vec_umov(pc, "umov", rd, toks, esz, lanes, arr, sign=False)
+            if d_elem is not None:
+                # INS from a scalar reg (mov vd.s[2], w1) shares _vec_ins
+                if any(t[0] == "gpr" for t in toks):
+                    return self._vec_ins(pc, rd, toks, arr)
+                return self._vec_mov_elem(pc, rd, toks, arr)
+            if rd[:1] in ("s", "d", "h", "b"):
+                # scalar-register destination from an element source:
+                # mov s1, v0.s[1] == FMOV/INS S1, V0.S[1] -- writes the low
+                # lane and keeps the rest of the register
+                se = next((t for t in toks if t[0] == "elem" and t[1] != rd), None)
+                if se is not None:
+                    return self._elem_copy(rd, rd[0], 0, se[1], se[2], se[3])
+            src_v = next((t for t in toks if t[0] == "v" and t[1] != rd), None)
+            if src_v is not None and rd[:1] in ("v", "q"):
+                # whole-register copy (ORR alias): both 64-bit halves
+                si = self.ridx(src_v[1])
+                di = self.ridx(rd)
+                self.em(f"c->d[{di}] = c->d[{si}]; c->dhi[{di}] = c->dhi[{si}];")
+                return
+            raise Unsupported(pc, 0, "vec 'mov' shape", m)
+        if m == "ins":
+            return self._vec_ins(pc, rd, toks, arr)
+        if m == "dup":
+            return self._vec_dup(pc, rd, toks, esz, lanes, arr)
+        if m in ("fmov",) and any(t[0] in ("fp", "imm") for t in toks):
+            return self._vec_fmov_imm(pc, rd, toks, esz, lanes, arr)
+        if m == "fmov":
+            return self._vec_fmov_reg(pc, m, rd, toks, arr)
+
+        # ---- immediate broadcast: movi / mvni already handled above gen ----
+        # ---- pairwise / reduction scalar-dest forms ----
+        if m in ("faddp", "fmaxp", "fminp", "fmaxnmv", "fminnmv",
+                 "fmaxv", "fminv", "addp", "addv", "saddlv", "uaddlv",
+                 "sadalp", "uadalp", "saddlp", "uaddlp", "smaxv", "umaxv",
+                 "sminv", "uminv") and (rd[:1] in ("s", "d", "w", "x") or
+                                        any(t[0] == "gpr" for t in toks)):
+            return self._vec_reduce(pc, m, rd, toks, arr, lanes, esz)
+
+        # ---- table lookup ----
+        if m in ("tbl", "tbx"):
+            return self._vec_tbl(pc, m, rd, toks, arr, lanes, esz)
+
+        # ---- permutes ----
+        if m in ("zip1", "zip2", "uzp1", "uzp2", "trn1", "trn2", "ext"):
+            return self._vec_permute(pc, m, rd, toks, arr, lanes, esz)
+
+        # ---- crypto ----
+        if m in ("aese", "aesd", "aesimc"):
+            return self._vec_crypto(pc, m, rd, toks, arr, lanes, esz)
+
+        # ---- shift by immediate (VSHI / VSHI2 / VSHRREG families) ----
+        if m in ("shl", "sshr", "ushr", "srshr", "urshr", "sli", "sri",
+                 "sqshl", "uqshl", "sqshlu", "ssra", "ursra", "srsra",
+                 "usra") and any(t[0] == "imm" for t in toks):
+            return self._vec_shift_imm(pc, m, rd, toks, arr, lanes, esz)
+
+        # ---- shift / arithmetic by register ----
+        if m in ("ushl", "sshl", "sqrshl", "uqrshl", "sqshl", "uqshl",
+                 "sqshlu", "srshl", "urshl"):
+            return self._vec_shift_reg(pc, m, rd, toks, arr, lanes, esz)
+
+        # ---- widening / narrowing ----
+        if m in ("xtn", "xtn2", "sqxtn", "sqxtn2", "uqxtn", "uqxtn2",
+                 "sqxtun", "sqxtun2", "shrn", "shrn2", "rshrn", "rshrn2",
+                 "sqshrn", "sqshrn2", "sqrshrn", "sqrshrn2", "uqshrn",
+                 "uqshrn2", "uqrshrn", "uqrshrn2", "sqshrun", "sqrshrun",
+                 "shll", "shll2", "ushll", "ushll2", "sshll", "sshll2",
+                 "sxtl", "sxtl2", "uxtl", "uxtl2", "addhn", "addhn2",
+                 "raddhn", "raddhn2", "subhn", "subhn2", "saddw", "saddw2",
+                 "uaddw", "uaddw2", "ssubw", "ssubw2", "usubw", "usubw2",
+                 "saddl", "saddl2", "uaddl", "uaddl2", "ssubl", "ssubl2",
+                 "usubl", "usubl2", "smull", "smull2", "umull", "umull2",
+                 "smlal", "smlal2", "umlal", "umlal2", "smlsl", "smlsl2",
+                 "umlsl", "umlsl2", "sqdmull", "sqdmull2", "sqdmlal",
+                 "sqdmlal2", "sqdmlsl", "sqdmlsl2", "pmull", "pmull2",
+                 "pmul", "sqdmulh", "sqrdmulh"):
+            return self._vec_widen(pc, m, rd, toks, arr, lanes, esz)
+
+        # ---- widening by immediate (shifted) ----
+        if m in ("shrn", "rshrn", "sqshrn", "sqrshrn", "uqshrn", "uqrshrn",
+                 "sqshrun", "sqrshrun") and any(t[0] == "imm" for t in toks):
+            return self._vec_widen(pc, m, rd, toks, arr, lanes, esz)
+
+        # ---- general 3-operand lane arithmetic / logic / compare ----
+        if len(toks) >= 2:
+            return self._vec_laneop(pc, m, rd, toks, arr, lanes, esz, fp)
+
+        raise Unsupported(pc, 0, f"vec '{m}' shape", m)
+
+    def _guess_arr(self, rd, toks):
+        """Derive an arrangement string when op_str has none.
+
+        umov/smov/dup from a GPR print no arrangement.  Element ops carry
+        their own element size on the token, so prefer that; fall back to the
+        destination register class.
+        """
+        if rd and rd[:1] in ("v", "q"):
+            return "16b"
+        for t in toks:
+            if t[0] == "elem":
+                return t[2] + "1"          # 1 x element (lanes unused)
+        return None
+
+    # ---- element moves -------------------------------------------------
+    def _vec_umov(self, pc, m, rd, toks, esz, lanes, arr, sign):
+        src = next((t for t in toks if t[0] == "elem"), None)
+        if src is None:
+            # umov wd, vn.s  (whole low element, no index printed)
+            src = next((t for t in toks if t[0] == "v"), None)
+            if src is None:
+                raise Unsupported(pc, 0, f"{m} src", m)
+            reg, echar, eidx = src[1], "d", 0
+        else:
+            _, reg, echar, eidx = src
+        eesz = self.ARR_ESZ[echar]
+        idx = self.ridx(reg)
+        off = eidx * eesz
+        # read the element out of d[]/dhi[]
+        if off + eesz <= 8:
+            val = (f"(c->d[{idx}] >> {off * 8})"
+                   if eesz == 8 else
+                   f"((c->d[{idx}] >> {off * 8}) & {(1 << (eesz * 8)) - 1:#x}ull)")
+            if eesz < 8:
+                val = f"({val})"
+        else:
+            ho = off - 8
+            val = (f"(c->dhi[{idx}] >> {ho * 8})" if eesz == 8 else
+                   f"((c->dhi[{idx}] >> {ho * 8}) & {(1 << (eesz * 8)) - 1:#x}ull)")
+        if sign:
+            bits = eesz * 8
+            if bits < 64:
+                val = f"(uint64_t)(int64_t)(int{bits}_t)({val})"
+        self.put(self.wr(rd, val, self.is_w(rd)))
+
+    def _vec_mov_elem(self, pc, rd, toks, arr):
+        """mov vd.d[1], vn.d[0]  -> element copy preserving other lanes."""
+        dst = next((t for t in toks if t[0] == "elem"), None)
+        src = next((t[1:] for t in toks if t[0] == "elem" and t is not dst), None)
+        if src is None:
+            src = next((t[1:] for t in toks if t[0] == "v"), None)
+        if dst is None or src is None:
+            raise Unsupported(pc, 0, "mov elem shape", "mov")
+        _, _dreg, dchar, didx = dst
+        esz = self.ARR_ESZ[dchar]
+        # src is t[1:]: (reg, esz_char, idx) or (reg,)
+        if len(src) >= 3:
+            sreg, schar, sidx = src[0], src[1], src[2]
+        else:
+            sreg, schar, sidx = src[0], dchar, 0
+        self._elem_copy(rd, dchar, didx, sreg, schar, sidx)
+
+    def _elem_copy(self, rd, dchar, didx, sreg, schar, sidx):
+        esz = self.ARR_ESZ[dchar]
+        di, si = self.ridx(rd), self.ridx(sreg)
+        doff, soff = didx * esz, sidx * esz
+        # read source element into a uint64 temp
+        t = self._newtmp(1)[0]
+        if soff + esz <= 8:
+            self.em(f"uint64_t {t} = (c->d[{si}] >> {soff * 8}) & "
+                    f"{(1 << (esz * 8)) - 1:#x}ull;")
+        else:
+            self.em(f"uint64_t {t} = (c->dhi[{si}] >> {(soff - 8) * 8}) & "
+                    f"{(1 << (esz * 8)) - 1:#x}ull;")
+        mask = ((1 << (esz * 8)) - 1) << (doff * 8)
+        if doff + esz <= 8:
+            self.em(f"c->d[{di}] = (c->d[{di}] & ~{mask:#x}ull) | ({t} << {doff * 8});")
+        else:
+            hoff = doff - 8
+            hmask = ((1 << (esz * 8)) - 1) << (hoff * 8)
+            self.em(f"c->dhi[{di}] = (c->dhi[{di}] & ~{hmask:#x}ull) | ({t} << {hoff * 8});")
+
+    def _vec_ins(self, pc, rd, toks, arr):
+        """ins vd.s[2], w1  /  ins vd.d[0], xn."""
+        dst = next((t for t in toks if t[0] == "elem"), None)
+        if dst is None:
+            raise Unsupported(pc, 0, "ins dst", "ins")
+        _, _dreg, dchar, didx = dst
+        esz = self.ARR_ESZ[dchar]
+        src = next((t for t in toks if t[0] == "gpr"), None)
+        if src is not None:
+            val = self.rd(src[1], self.is_w(src[1]))
+        else:
+            se = next((t for t in toks if t[0] == "elem" and t[1] != rd), None)
+            if se is None:
+                raise Unsupported(pc, 0, "ins src", "ins")
+            _, sreg, schar, sidx = se
+            si = self.ridx(sreg)
+            soff = sidx * self.ARR_ESZ[schar]
+            if soff + esz <= 8:
+                val = f"((c->d[{si}] >> {soff * 8}) & {(1 << (esz * 8)) - 1:#x}ull)"
+            else:
+                val = f"((c->dhi[{si}] >> {(soff - 8) * 8}) & {(1 << (esz * 8)) - 1:#x}ull)"
+        di = self.ridx(rd)
+        doff = didx * esz
+        mask = ((1 << (esz * 8)) - 1) << (doff * 8)
+        if doff + esz <= 8:
+            self.em(f"c->d[{di}] = (c->d[{di}] & ~{mask:#x}ull) | (({val}) << {doff * 8});")
+        else:
+            hoff = doff - 8
+            hmask = ((1 << (esz * 8)) - 1) << (hoff * 8)
+            self.em(f"c->dhi[{di}] = (c->dhi[{di}] & ~{hmask:#x}ull) | (({val}) << {hoff * 8});")
+
+    def _vec_dup(self, pc, rd, toks, esz, lanes, arr):
+        """dup vd.2d, xn  /  dup vd.4s, v1.s[2]  /  dup vd.16b, w1."""
+        idx = self.ridx(rd)
+        src = next((t for t in toks if t[0] == "gpr"), None)
+        t = self._newtmp(1)[0]
+        if src is not None:
+            val = self.rd(src[1], self.is_w(src[1]))
+            self.em(f"uint64_t {t} = ({val}) & {(1 << (esz * 8)) - 1:#x}ull;")
+        else:
+            el = next((t_ for t_ in toks if t_[0] == "elem"), None)
+            vr = next((t_ for t_ in toks if t_[0] == "v"), None)
+            if el is not None:
+                _, sreg, schar, sidx = el
+                eesz = self.ARR_ESZ[schar]
+                soff = sidx * eesz
+                si = self.ridx(sreg)
+                if soff + eesz <= 8:
+                    self.em(f"uint64_t {t} = (c->d[{si}] >> {soff * 8}) & "
+                            f"{(1 << (eesz * 8)) - 1:#x}ull;")
+                else:
+                    self.em(f"uint64_t {t} = (c->dhi[{si}] >> {(soff - 8) * 8}) & "
+                            f"{(1 << (eesz * 8)) - 1:#x}ull;")
+            elif vr is not None:
+                si = self.ridx(vr[1])
+                self.em(f"uint64_t {t} = c->d[{si}];")
+            else:
+                raise Unsupported(pc, 0, "dup src", "dup")
+        # broadcast across the arrangement
+        lane_bits = esz * 8
+        rep = sum(1 << (lane_bits * k) for k in range(64 // lane_bits))
+        if lanes * esz >= 16:
+            self.em(f"V128 {t}v; {t}v.lo = {t} * {rep:#x}ull; {t}v.hi = {t}v.lo;")
+            self.em(f"vst128(c, {idx}, {t}v);")
+        elif lanes * esz == 8:
+            self.em(f"c->d[{idx}] = {t} * {rep:#x}ull;")
+        else:
+            mask = (1 << (lanes * esz)) - 1
+            self.em(f"c->d[{idx}] = (c->d[{idx}] & ~{mask:#x}ull) | "
+                    f"(({t} * {rep:#x}ull) & {mask:#x}ull);")
+
+    def _vec_fmov_imm(self, pc, rd, toks, esz, lanes, arr):
+        src = next((t for t in toks if t[0] in ("fp", "imm")), None)
+        if src is None:
+            raise Unsupported(pc, 0, "fmov imm", "fmov")
+        import struct as _s
+        idx = self.ridx(rd)
+        if esz == 8:
+            bits = _s.unpack("<Q", _s.pack("<d", float(src[1])))[0]
+            self.em(f"V128 __fm; __fm.lo = {bits:#x}ull; __fm.hi = {bits:#x}ull;")
+            self.em(f"vst128(c, {idx}, __fm);")
+        else:
+            bits = _s.unpack("<I", _s.pack("<f", float(src[1])))[0]
+            rep = bits | (bits << 32)
+            if lanes * esz >= 16:
+                self.em(f"V128 __fm; __fm.lo = {rep:#x}ull; __fm.hi = {rep:#x}ull;")
+                self.em(f"vst128(c, {idx}, __fm);")
+            elif lanes * esz == 8:
+                self.em(f"c->d[{idx}] = {rep:#x}ull;")
+            else:
+                mask = (1 << (lanes * esz)) - 1
+                self.em(f"c->d[{idx}] = (c->d[{idx}] & ~{mask:#x}ull) | "
+                        f"({rep:#x}ull & {mask:#x}ull);")
+
+    def _vec_fmov_reg(self, pc, m, rd, toks, arr):
+        src = next((t for t in toks if t[0] in ("gpr", "v", "elem")), None)
+        if src is None:
+            raise Unsupported(pc, 0, "fmov reg", m)
+        di = self.ridx(rd)
+        if src[0] == "gpr":
+            val = self.rd(src[1], self.is_w(src[1]))
+            if rd[:1] == "d":
+                self.em(f"c->d[{di}] = (uint64_t)({val});")
+            else:
+                self.em(f"c->d[{di}] = (uint64_t)(uint32_t)({val});")
+            return
+        if src[0] == "elem":
+            self._vec_ins(pc, rd, [("elem", rd, src[2], src[3])] +
+                          [t for t in toks if t is not src], arr)
+            return
+        # fmov d0, v1.d[0] handled by elem; plain fmov s0, v1.s is elem-less
+        si = self.ridx(src[1])
+        if rd[:1] == "d":
+            self.em(f"c->d[{di}] = c->d[{si}];")
+        else:
+            self.em(f"c->d[{di}] = (c->d[{di}] & ~0xffffffffull) | "
+                    f"(c->d[{si}] & 0xffffffffull);")
+
+    # ---- reductions / pairwise-scalar ---------------------------------
+    def _vec_reduce(self, pc, m, rd, toks, arr, lanes, esz):
+        """Reductions whose destination is a scalar (s/d/w/x register).
+
+        e.g. addv s0, v1.4s  /  faddp d0, v1.2d  /  umaxv b0, v1.16b
+        """
+        src = next((t for t in toks if t[0] == "v"), None)
+        if src is None:
+            raise Unsupported(pc, 0, f"{m} src", m)
+        a = self._vld(self._newtmp(1)[0], src[1])
+        out = self._newtmp(1)[0]
+        fp = esz in (4, 8) and m[0] == "f"
+        sfx = self._fp_suffix(esz) if fp else self._lane_suffix(esz)
+
+        if m == "addv":
+            fn = f"v_addv_{ {'4': '4s', '8': '8h', '16': '16b', '2': '2d'}[str(lanes)] }"
+            if lanes not in (4, 8, 16, 2):
+                raise Unsupported(pc, 0, f"addv lanes {lanes}", m)
+            self.em(f"V128 {out} = {fn}({a}, {lanes});")
+        elif m in ("umaxv", "smaxv", "sminv", "uminv", "fmaxv", "fminv",
+                   "fmaxnmv", "fminnmv"):
+            fn = {"umaxv": "v_umaxv", "smaxv": "v_smaxv", "sminv": "v_sminv",
+                  "uminv": "v_uminv", "fmaxv": "v_fmaxv", "fminv": "v_fminv",
+                  "fmaxnmv": "v_fmaxnmv", "fminnmv": "v_fminnmv"}[m]
+            # these helpers take (V128, int n)
+            self.em(f"V128 {out} = {fn}_{sfx}({a}, {lanes});")
+        elif m in ("faddp", "fmaxp", "fminp") and rd[:1] == "s" and lanes == 2:
+            # scalar pairwise of the low 64 bits
+            fn = {"faddp": "v_faddp_scalar_s", "fmaxp": "v_fmaxp_scalar_s",
+                  "fminp": "v_fminp_scalar_s"}[m]
+            self.em(f"V128 {out}; {out}.lo = 0; {out}.hi = 0;")
+            self.em(f"{out}.lo = (uint64_t)(uint32_t)f32b({fn}({a}));")
+        elif m in ("faddp", "fmaxp", "fminp", "addp") and rd[:1] == "d":
+            fn = {"faddp": "v_faddp_scalar_d", "fmaxp": "v_fmaxp_scalar_d",
+                  "fminp": "v_fminp_scalar_d", "addp": "v_addp_scalar_d"}[m]
+            self.em(f"V128 {out}; {out}.lo = {fn}({a}); {out}.hi = 0;")
+        elif m == "addp" and rd[:1] == "w":
+            self.em(f"V128 {out}; {out}.lo = (uint64_t)(uint32_t)(a.lo + a.hi);")
+        elif m in ("saddlp", "uaddlp", "sadalp", "uadalp"):
+            fn = f"v_{m}_{sfx}"
+            self.em(f"V128 {out} = {fn}({a});")
+        elif m in ("saddlv", "uaddlv"):
+            fn = f"v_{m}_{self._lane_suffix(esz)}"
+            self.em(f"V128 {out} = {fn}({a}, {lanes});")
+        else:
+            raise Unsupported(pc, 0, f"reduce '{m}'", m)
+        # store the scalar result
+        if rd[:1] in ("w", "x"):
+            self.put(self.wr(rd, f"(uint64_t)(uint32_t){out}.lo", self.is_w(rd)))
+        elif rd[:1] == "s":
+            self.em(f"c->d[{self.ridx(rd)}] = (c->d[{self.ridx(rd)}] & ~0xffffffffull) | "
+                    f"({out}.lo & 0xffffffffull);")
+        else:  # d
+            self.em(f"c->d[{self.ridx(rd)}] = {out}.lo;")
+
+    # ---- table lookup --------------------------------------------------
+    def _vec_tbl(self, pc, m, rd, toks, arr, lanes, esz):
+        lists = [t for t in toks if t[0] == "list"]
+        if not lists:
+            # capstone flattens {v0.16b, v1.16b} into reg tokens; rebuild from op_str
+            import re as _re
+            lm = _re.search(r"\{([^}]*)\}", self._cur_insn.op_str)
+            if not lm:
+                raise Unsupported(pc, 0, f"{m} list", m)
+            regs = [t.strip().split(".")[0] for t in lm.group(1).split(",") if t.strip()]
+        else:
+            regs = lists[0][1]
+        idx_t = next((t for t in toks if t[0] == "v" and t[1] not in regs), None)
+        if idx_t is None:
+            idx_t = next((t for t in toks if t[0] == "v"), None)
+        if idx_t is None:
+            raise Unsupported(pc, 0, f"{m} idx", m)
+        names = [self._vld(self._newtmp(1)[0], r) for r in regs]
+        while len(names) < 4:
+            z = self._newtmp(1)[0]
+            self._vzero(z)
+            names.append(z)
+        ia = self._vld(self._newtmp(1)[0], idx_t[1])
+        out = self._newtmp(1)[0]
+        fn = "v_tbl" if m == "tbl" else "v_tbx"
+        args = ", ".join(names[:4] + [ia, str(len(regs))])
+        if m == "tbx":
+            old = self._vld(self._newtmp(1)[0], rd)
+            args = f"{old}, " + args
+        self.em(f"V128 {out} = {fn}({args});")
+        self._vst(rd, out, esz, lanes)
+
+    # ---- permutes ------------------------------------------------------
+    def _vec_permute(self, pc, m, rd, toks, arr, lanes, esz):
+        if m == "ext":
+            imms = [t[1] for t in toks if t[0] == "imm"]
+            if not imms:
+                raise Unsupported(pc, 0, "ext imm", m)
+            srcs = [t for t in toks if t[0] == "v"]
+            if len(srcs) < 2:
+                raise Unsupported(pc, 0, "ext srcs", m)
+            a = self._vld(self._newtmp(1)[0], srcs[0][1])
+            b = self._vld(self._newtmp(1)[0], srcs[1][1])
+            out = self._newtmp(1)[0]
+            self.em(f"V128 {out} = v_ext({a}, {b}, {imms[0]});")
+            self._vst(rd, out, esz, lanes)
+            return
+        base = {"zip1": "v_zip1", "zip2": "v_zip1",
+                "uzp1": "v_uzp1", "uzp2": "v_uzp1",
+                "trn1": "v_trn1", "trn2": "v_trn1"}[m]
+        hi = 1 if m.endswith("2") else 0
+        sfx = self._lane_suffix(esz)
+        srcs = [t for t in toks if t[0] == "v"]
+        if len(srcs) < 2:
+            raise Unsupported(pc, 0, f"{m} srcs", m)
+        a = self._vld(self._newtmp(1)[0], srcs[0][1])
+        b = self._vld(self._newtmp(1)[0], srcs[1][1])
+        out = self._newtmp(1)[0]
+        # helpers: v_zip1_u32(a, b, n, hi) -> full-128 result for n lanes
+        self.em(f"V128 {out} = {base}_{sfx}({a}, {b}, {lanes}, {hi});")
+        self._vst(rd, out, esz, lanes)
+
+    # ---- crypto --------------------------------------------------------
+    def _vec_crypto(self, pc, m, rd, toks, arr, lanes, esz):
+        if m == "aesimc":
+            src = next((t for t in toks if t[0] == "v"), None)
+            if src is None:
+                raise Unsupported(pc, 0, "aesimc src", m)
+            a = self._vld(self._newtmp(1)[0], src[1])
+            out = self._newtmp(1)[0]
+            self.em(f"V128 {out} = v_aesimc({a});")
+            self._vst(rd, out, 1, 16)
+            return
+        srcs = [t for t in toks if t[0] == "v"]
+        if len(srcs) < 2:
+            raise Unsupported(pc, 0, f"{m} srcs", m)
+        a = self._vld(self._newtmp(1)[0], rd)   # state = current dest
+        b = self._vld(self._newtmp(1)[0], srcs[-1][1])
+        out = self._newtmp(1)[0]
+        self.em(f"V128 {out} = v_{m}({a}, {b});")
+        self._vst(rd, out, 1, 16)
+
+    # ---- shifts --------------------------------------------------------
+    def _vec_shift_imm(self, pc, m, rd, toks, arr, lanes, esz):
+        imms = [t[1] for t in toks if t[0] == "imm"]
+        if not imms:
+            raise Unsupported(pc, 0, f"{m} imm", m)
+        n = imms[0]
+        src = next((t for t in toks if t[0] == "v"), None)
+        if src is None:
+            raise Unsupported(pc, 0, f"{m} src", m)
+        a = self._vld(self._newtmp(1)[0], src[1])
+        sfx = self._lane_suffix(esz)
+        out = self._newtmp(1)[0]
+        # VSHI family: v_{m}_{lane}(V128, int n)
+        fn = f"v_{m}_{sfx}"
+        if m in ("ssra", "ursra", "srsra", "usra"):
+            # accumulate-into-dest shifts read the dest first
+            cur = self._vld(self._newtmp(1)[0], rd)
+            self.em(f"V128 {out} = {fn}({cur}, {a}, {n});")
+        else:
+            self.em(f"V128 {out} = {fn}({a}, {n});")
+        self._vst(rd, out, esz, lanes)
+
+    def _vec_shift_reg(self, pc, m, rd, toks, arr, lanes, esz):
+        srcs = [t for t in toks if t[0] == "v"]
+        if len(srcs) < 2:
+            raise Unsupported(pc, 0, f"{m} srcs", m)
+        a = self._vld(self._newtmp(1)[0], srcs[0][1])
+        b = self._vld(self._newtmp(1)[0], srcs[1][1])
+        sfx = self._lane_suffix(esz)
+        out = self._newtmp(1)[0]
+        fn = f"v_{m}_{sfx}"
+        self.em(f"V128 {out} = {fn}({a}, {b});")
+        self._vst(rd, out, esz, lanes)
+
+    # ---- widening / narrowing ------------------------------------------
+    def _vec_widen(self, pc, m, rd, toks, arr, lanes, esz):
+        """Widening/narrowing/multiply-long family.
+
+        Source element size differs from the destination arrangement's, so
+        the pair (src_esz, dst_esz) picks the a64_ctx.h instantiation.
+        """
+        src = next((t for t in toks if t[0] in ("v", "elem")), None)
+        if src is None:
+            raise Unsupported(pc, 0, f"{m} src", m)
+        if src[0] == "v":
+            a = self._vld(self._newtmp(1)[0], src[1])
+        else:
+            a = self._elem_expr(pc, src, self.ARR_ESZ[src[2]], broadcast=True)
+        imms = [t[1] for t in toks if t[0] == "imm"]
+
+        # source element size: infer from the mnemonic family + dst
+        # dst esz is `esz`; widening ops have src_esz = esz/2, narrowing esz*2
+        WIDEN = {"smull": ("smull", 2), "smull2": ("smull", 2),
+                 "umull": ("umull", 2), "umull2": ("umull", 2),
+                 "smlal": ("smlal", 2), "smlal2": ("smlal", 2),
+                 "umlal": ("umlal", 2), "umlal2": ("umlal", 2),
+                 "smlsl": ("smlsl", 2), "smlsl2": ("smlsl", 2),
+                 "umlsl": ("umlsl", 2), "umlsl2": ("umlsl", 2),
+                 "sqdmull": ("sqdmull", 2), "sqdmull2": ("sqdmull", 2),
+                 "sqdmlal": ("sqdmlal", 2), "sqdmlal2": ("sqdmlal", 2),
+                 "sqdmlsl": ("sqdmlsl", 2), "sqdmlsl2": ("sqdmlsl", 2),
+                 "pmull": ("pmull", 2), "pmull2": ("pmull", 2),
+                 "saddw": ("saddw", 2), "saddw2": ("saddw", 2),
+                 "uaddw": ("uaddw", 2), "uaddw2": ("uaddw", 2),
+                 "ssubw": ("ssubw", 2), "ssubw2": ("ssubw", 2),
+                 "usubw": ("usubw", 2), "usubw2": ("usubw", 2),
+                 "saddl": ("saddl", 2), "saddl2": ("saddl", 2),
+                 "uaddl": ("uaddl", 2), "uaddl2": ("uaddl", 2),
+                 "ssubl": ("ssubl", 2), "ssubl2": ("ssubl", 2),
+                 "usubl": ("usubl", 2), "usubl2": ("usubl", 2),
+                 "ushll": ("ushll", 2), "ushll2": ("ushll", 2),
+                 "sshll": ("sshll", 2), "sshll2": ("sshll", 2),
+                 "shll": ("shll", 2), "shll2": ("shll", 2),
+                 "sxtl": ("sshll", 2), "sxtl2": ("sshll", 2),
+                 "uxtl": ("ushll", 2), "uxtl2": ("ushll", 2),
+                 "xtn": ("xtn", 1), "xtn2": ("xtn", 1),
+                 "sqxtn": ("sqxtn", 1), "sqxtn2": ("sqxtn", 1),
+                 "uqxtn": ("uqxtn", 1), "uqxtn2": ("uqxtn", 1),
+                 "sqxtun": ("sqxtun", 1), "sqxtun2": ("sqxtun", 1),
+                 "shrn": ("shrn", 1), "shrn2": ("shrn", 1),
+                 "rshrn": ("rshrn", 1), "rshrn2": ("rshrn", 1),
+                 "sqshrn": ("sqshrn", 1), "sqshrn2": ("sqshrn", 1),
+                 "sqrshrn": ("sqrshrn", 1), "sqrshrn2": ("sqrshrn", 1),
+                 "uqshrn": ("uqshrn", 1), "uqshrn2": ("uqshrn", 1),
+                 "uqrshrn": ("uqrshrn", 1), "uqrshrn2": ("uqrshrn", 1),
+                 "sqshrun": ("sqshrun", 1), "sqrshrun": ("sqrshrun", 1),
+                 "addhn": ("addhn", 1), "addhn2": ("addhn", 1),
+                 "raddhn": ("raddhn", 1), "raddhn2": ("raddhn", 1),
+                 "subhn": ("subhn", 1), "subhn2": ("subhn", 1),
+                 "pmul": ("pmul", 1), "sqdmulh": ("sqdmulh", 0),
+                 "sqrdmulh": ("sqrdmulh", 0)}
+        if m not in WIDEN:
+            raise Unsupported(pc, 0, f"widen '{m}'", m)
+        fam, dirn = WIDEN[m]
+        s2 = 2 if dirn == 2 else (1 if dirn == 1 else 0)
+
+        if s2 == 0:  # same-width (sqdmulh/sqrdmulh/pmul)
+            b_toks = [t for t in toks if t[0] in ("v", "elem") and t is not src]
+            if not b_toks:
+                raise Unsupported(pc, 0, f"{m} src2", m)
+            if b_toks[0][0] == "elem":
+                b = self._elem_expr(pc, b_toks[0], esz, broadcast=True)
+            else:
+                b = self._vld(self._newtmp(1)[0], b_toks[0][1])
+            out = self._newtmp(1)[0]
+            if fam == "pmul":
+                self.em(f"V128 {out} = v_pmul_u8({a}, {b});")
+            else:
+                self.em(f"V128 {out} = v_{fam}_{self._lane_suffix(esz)}({a}, {b});")
+            self._vst(rd, out, esz, lanes)
+            return
+
+        # direction: dirn==1 narrowing (src is WIDER), dirn==2 widening
+        # (src is NARROWER).  Derive the src lane size from the destination.
+        if dirn == 1:
+            # narrowing: source lane is DOUBLE the destination lane width
+            src_esz = esz * 2
+        elif dirn == 2:
+            src_esz = esz // 2
+        else:
+            src_esz = esz
+        if src_esz < 1 or src_esz > 8:
+            raise Unsupported(pc, 0, f"widen esz {m}", m)
+        d_sfx = self._lane_suffix(esz)
+        s_sfx = self._lane_suffix(src_esz)
+
+        # two-source widening ops need both sources
+        TWO = ("saddw", "uaddw", "ssubw", "usubw", "saddl", "uaddl",
+               "ssubl", "usubl", "smull", "umull", "smlal", "umlal",
+               "smlsl", "umlsl", "sqdmull", "sqdmlal", "sqdmlsl",
+               "pmull", "sqdmulh", "sqrdmulh")
+        b_toks = [t for t in toks if t[0] in ("v", "elem") and t is not src]
+
+        if dirn == 2:  # widening: src half-width -> dst
+            if fam in TWO and b_toks:
+                b = self._vld(self._newtmp(1)[0], b_toks[0][1])
+                # accumulating ops read dest first as z
+                if fam in ("smlal", "umlal", "smlsl", "umlsl", "sqdmlal",
+                           "sqdmlsl"):
+                    z = self._vld(self._newtmp(1)[0], rd)
+                    out = self._newtmp(1)[0]
+                    self.em(f"V128 {out} = v_{fam}_{d_sfx}_{s_sfx}({z}, {a}, {b});")
+                else:
+                    out = self._newtmp(1)[0]
+                    self.em(f"V128 {out} = v_{fam}_{d_sfx}_{s_sfx}({a}, {b});")
+            elif imms:
+                # ushll/sshll/shll with immediate shift: shift = esz*8 - 16
+                # is the usual SXTL/UXTL form; otherwise the encoded imm.
+                sh = imms[0]
+                shamt = 0 if sh is None else int(sh)
+                fn = {"ushll": "v_ushlll", "sshll": "v_sshlll",
+                      "shll": "v_ushlll", "uxtl": "v_ushlll",
+                      "sxtl": "v_sshlll"}.get(fam, f"v_{fam}")
+                if fam in ("uxtl", "sxtl"):
+                    shamt = esz * 4
+                out = self._newtmp(1)[0]
+                self.em(f"V128 {out} = {fn}_{d_sfx}_{s_sfx}({a}, {shamt});")
+            else:
+                raise Unsupported(pc, 0, f"widen '{m}' args", m)
+            self._vst(rd, out, esz, lanes)
+            return
+
+        # narrowing (dirn == 1): dst half-width, optional shift immediate
+        sh = imms[0] if imms else 0
+        base = fam
+        out = self._newtmp(1)[0]
+        if base in ("shrn", "rshrn"):
+            self.em(f"V128 {out} = v_{base}_{d_sfx}_{s_sfx}({a}, {sh});")
+        elif base in ("sqshrn", "sqrshrn", "uqshrn", "uqrshrn",
+                      "sqshrun", "sqrshrun"):
+            self.em(f"V128 {out} = v_{base}_{d_sfx}_{s_sfx}({a}, {sh});")
+        elif base in ("xtn", "sqxtn", "uqxtn", "sqxtun"):
+            self.em(f"V128 {out} = v_{base}_{d_sfx}_{s_sfx}({a});")
+        elif base in ("addhn", "raddhn", "subhn"):
+            b_toks2 = [t for t in toks if t[0] == "v" and t is not src]
+            if not b_toks2:
+                raise Unsupported(pc, 0, f"{m} src2", m)
+            b = self._vld(self._newtmp(1)[0], b_toks2[0][1])
+            self.em(f"V128 {out} = v_{base}_{d_sfx}_{s_sfx}({a}, {b});")
+        else:
+            raise Unsupported(pc, 0, f"narrow '{m}'", m)
+        self._vst(rd, out, esz, lanes)
+
+    # ---- general lane op ------------------------------------------------
+    def _vec_laneop(self, pc, m, rd, toks, arr, lanes, esz, fp):
+        """Generic 2/3-operand lane-wise operation.
+
+        Maps the mnemonic + lane type onto an a64_ctx.h helper (VINT2/VINT4/
+        VFP2/VFP3/VCMP families) and emits load/call/store.
+        """
+        import struct as _s
+        imms = [t for t in toks if t[0] in ("imm", "fp")]
+        srcs = [t for t in toks if t[0] in ("v", "elem", "list")]
+
+        # ---- immediate forms: and/orr/eor/bic/mov(movi) with #imm ----
+        if imms and m in ("and", "orr", "eor", "bic", "orn", "mvni",
+                          "cmeq", "cmge", "cmgt", "cmle", "cmlt", "fcmeq",
+                          "fcmge", "fcmgt", "fcmle", "fcmlt"):
+            val = imms[0][1]
+            a_t = next((t for t in toks if t[0] == "v"), None)
+            if a_t is None:
+                raise Unsupported(pc, 0, f"{m} imm src", m)
+            a = self._vld(self._newtmp(1)[0], a_t[1])
+            out = self._newtmp(1)[0]
+            if m in ("cmeq", "cmge", "cmgt", "cmle", "cmlt"):
+                z = self._newtmp(1)[0]
+                self._vzero(z)
+                fn = {"cmeq": "v_cmeq", "cmge": "v_cmge", "cmgt": "v_cmgt",
+                      "cmle": "v_cmle", "cmlt": "v_cmlt"}[m]
+                # immediate compares are vs zero or the scalar imm; ARM only
+                # encodes #0 for cmlt/cmeq, so treat the imm as a broadcast
+                if val == 0:
+                    self.em(f"V128 {out} = {fn}_{self._lane_suffix(esz)}({a}, {z});")
+                else:
+                    b = self._newtmp(1)[0]
+                    self._vimm(b, val, esz, lanes)
+                    self.em(f"V128 {out} = {fn}_{self._lane_suffix(esz)}({a}, {b});")
+            elif m in ("fcmeq", "fcmge", "fcmgt", "fcmle", "fcmlt"):
+                if val == 0:
+                    z = self._newtmp(1)[0]
+                    self._vzero(z)
+                    fn = {"fcmeq": "v_fcmeq", "fcmge": "v_fcmge",
+                          "fcmgt": "v_fcmgt", "fcmle": "v_fcmle",
+                          "fcmlt": "v_fcmlt"}[m]
+                    self.em(f"V128 {out} = {fn}_{self._fp_suffix(esz)}({a}, {z});")
+                else:
+                    raise Unsupported(pc, 0, f"{m} #{val}", m)
+            else:
+                # bitwise immediate: and/orr/eor/bic/mvni/mov-mvi
+                lane_bits = esz * 8
+                lane = val & ((1 << lane_bits) - 1)
+                rep = sum(lane << (lane_bits * k) for k in range(64 // lane_bits))
+                b = self._newtmp(1)[0]
+                self.em(f"V128 {b}; {b}.lo = {rep:#x}ull; {b}.hi = {rep:#x}ull;")
+                if m == "mvni":
+                    self.em(f"{b}.lo = ~{b}.lo; {b}.hi = ~{b}.hi;")
+                fn = {"and": "v_and", "orr": "v_orr", "eor": "v_eor",
+                      "bic": "v_bic", "orn": "v_orn", "mvni": "v_orr",
+                      }.get(m, "v_and")
+                self.em(f"V128 {out} = {fn}({a}, {b});")
+            self._vst(rd, out, esz, lanes)
+            return
+
+        UNARY = {"neg", "abs", "not", "mvn", "fneg", "fabs", "fsqrt",
+                 "frecpe", "frsqrte", "sqabs", "sqneg", "cnt", "clz",
+                 "rev16", "rev32", "rev64", "cls", "urecpe", "ursqrte"}
+        if not srcs and m in UNARY:
+            # unary with dest as source (neg/abs/not/fneg/fabs/fsqrt/fcvt*)
+            a = self._vld(self._newtmp(1)[0], rd)
+            out = self._newtmp(1)[0]
+            sfx = self._fp_suffix(esz) if fp else self._lane_suffix(esz)
+            if m == "not":
+                self.em(f"V128 {out} = v_not({a});")
+            elif m in ("mvn",):
+                self.em(f"V128 {out} = v_orn({a}, {a});")
+            elif m in ("cnt",):
+                self.em(f"V128 {out} = v_cnt({a});")
+            elif m in ("rev16", "rev32", "rev64"):
+                self.em(f"V128 {out} = v_{m}({a});")
+            elif m in ("clz", "cls"):
+                self.em(f"V128 {out} = v_{m}_vec({a});")
+            elif m in ("sqabs",):
+                self.em(f"V128 {out} = v_abs_{self._lane_suffix(esz)}({a});")
+            elif m in ("sqneg", "neg"):
+                z = self._newtmp(1)[0]
+                self._vzero(z)
+                self.em(f"V128 {out} = v_sub_{self._lane_suffix(esz)}({z}, {a});")
+            elif m in ("fabs", "fneg", "fsqrt", "frecpe", "frsqrte",
+                       "urecpe", "ursqrte"):
+                self.em(f"V128 {out} = v_{m}_{sfx}({a});")
+            else:
+                raise Unsupported(pc, 0, f"unary '{m}'", m)
+            self._vst(rd, out, esz, lanes)
+            return
+        # ---- int<->FP conversions are unary, one vector source ----
+        # (placed before the no-src check: capstone may print the vector's
+        # low lane as an s/d-class token, e.g. fcvtzs s1, s0 is the .4S
+        # vector form fcvtzs v1.4s, v0.4s)
+        if m in ("scvtf", "ucvtf", "fcvtzs", "fcvtzu"):
+            src = srcs[0] if srcs else None
+            if src is None:
+                g = next((t for t in toks if t[0] == "gpr"
+                          and t[1][:1] in ("s", "d") and t[1] != rd), None)
+                if g is None:
+                    g = next((t for t in toks if t[0] == "gpr"
+                              and t[1][:1] in ("s", "d")), None)
+                if g is not None:
+                    src = ("v", g[1])
+            if src is None:
+                raise Unsupported(pc, 0, f"{m} src", m)
+            return self._vec_cvt(pc, m, rd, src, esz, lanes, imms)
+        if not srcs:
+            raise Unsupported(pc, 0, f"laneop '{m}' no src", m)
+
+        a_t = srcs[0]
+        a = (self._vld(self._newtmp(1)[0], a_t[1]) if a_t[0] == "v"
+             else self._elem_expr(pc, a_t, esz))
+
+        # ---- unary with an explicit single source (cnt v0.8b, v1.8b) ----
+        if m in UNARY and len(srcs) >= 1:
+            out = self._newtmp(1)[0]
+            if m in ("fabs", "fneg", "fsqrt", "frecpe", "frsqrte",
+                     "urecpe", "ursqrte"):
+                sfx = "_f32" if esz == 4 else "_f64"
+                self.em(f"V128 {out} = v_{m}{sfx}({a});")
+            elif m in ("mvn", "not"):
+                self.em(f"V128 {out} = v_not({a});")
+            elif m in ("cnt", "rev16", "rev32", "rev64"):
+                self.em(f"V128 {out} = v_{m}({a});")
+            elif m in ("clz", "cls"):
+                self.em(f"V128 {out} = v_{m}_{self._lane_suffix(esz)}({a});")
+            elif m == "sqabs":
+                self.em(f"V128 {out} = v_abs_{self._lane_suffix(esz)}({a});")
+            elif m in ("neg", "sqneg"):
+                z = self._newtmp(1)[0]
+                self._vzero(z)
+                self.em(f"V128 {out} = v_sub_{self._lane_suffix(esz)}({z}, {a});")
+            else:
+                raise Unsupported(pc, 0, f"unary '{m}'", m)
+            self._vst(rd, out, esz, lanes)
+            return
+
+        # ---- BSL / BIT / BIF (3 operands; dest is a source too) ----
+        if m in ("bsl", "bit", "bif"):
+            srcs3 = [t for t in toks if t[0] == "v"]
+            if len(srcs3) < 3:
+                raise Unsupported(pc, 0, f"{m} needs 3 vector srcs", m)
+            a3 = self._vld(self._newtmp(1)[0], srcs3[0][1])
+            b3 = self._vld(self._newtmp(1)[0], srcs3[1][1])
+            c3 = self._vld(self._newtmp(1)[0], srcs3[2][1])
+            out = self._newtmp(1)[0]
+            # BSL Vd,Vn,Vm = (Vd&Vn)|(~Vd&Vm); BIT = (Vm&Vn)|(~Vm&Vd);
+            # BIF = (Vm&Vd)|(~Vm&Vn)
+            if m == "bsl":
+                self.em(f"V128 {out} = v_bsl({a3}, {b3}, {c3});")
+            elif m == "bit":
+                self.em(f"V128 {out} = v_bit({c3}, {b3}, {a3});")
+            else:
+                self.em(f"V128 {out} = v_bif({c3}, {a3}, {b3});")
+            self._vst(rd, out, esz, lanes)
+            return
+
+        # second source (register or by-element broadcast)
+        b_expr = None
+        if len(toks) >= 3 or (len(srcs) >= 2):
+            b_t = next((t for t in srcs[1:]), None)
+            if b_t is not None:
+                if b_t[0] == "v":
+                    b_expr = self._vld(self._newtmp(1)[0], b_t[1])
+                elif b_t[0] == "elem":
+                    b_expr = self._elem_expr(pc, b_t, esz, broadcast=True)
+
+        # third source (fmla/fmls/acc forms: rd is the accumulator)
+        c_expr = None
+        if m in ("fmla", "fmls", "mla", "mls", "sqdmlal", "sqdmlsl",
+                 "smlal", "smlsl", "umlal", "umlsl") and b_expr is not None:
+            c_expr = self._vld(self._newtmp(1)[0], rd)
+
+        out = self._newtmp(1)[0]
+        sfx = self._fp_suffix(esz) if fp else self._lane_suffix(esz)
+
+        # ---- mnemonic -> helper ----
+        FP_BIN = {"fadd": "v_fadd", "fsub": "v_fsub", "fmul": "v_fmul",
+                  "fdiv": "v_fdiv", "fmax": "v_fmax", "fmin": "v_fmin",
+                  "fmaxnm": "v_fmaxnm", "fminnm": "v_fminnm", "fabd": "v_fabd",
+                  "fmulx": "v_fmulx", "faddp": "v_faddp", "fmaxp": "v_fmaxp",
+                  "fminp": "v_fminp", "frecps": "v_frecps", "frsqrts": "v_frsqrts"}
+        FP_CMP = {"fcmeq": "v_fcmeq", "fcmge": "v_fcmge", "fcmgt": "v_fcmgt",
+                  "fcmle": "v_fcmle", "fcmlt": "v_fcmlt"}
+        INT_BIN = {"add": "v_add", "sub": "v_sub", "mul": "v_mul",
+                   "and": "v_and", "orr": "v_orr", "eor": "v_eor",
+                   "bic": "v_bic", "orn": "v_orn", "addp": "v_addp",
+                   "smax": "v_smax", "umax": "v_umax", "smin": "v_smin",
+                   "umin": "v_umin", "smaxp": "v_smaxp", "umaxp": "v_umaxp",
+                   "sminp": "v_sminp", "uminp": "v_uminp",
+                   "shadd": "v_shadd", "uhadd": "v_uhadd", "shsub": "v_shsub",
+                   "uhsub": "v_uhsub", "urhadd": "v_urhadd",
+                   "sqadd": "v_sqadd", "uqadd": "v_uqadd", "sqsub": "v_sqsub",
+                   "uqsub": "v_uqsub", "sqdmulh": "v_sqdmulh",
+                   "sqrdmulh": "v_sqrdmulh", "pmul": "v_pmul"}
+        INT_CMP = {"cmeq": "v_cmeq", "cmge": "v_cmge", "cmgt": "v_cmgt",
+                   "cmhi": "v_cmhi", "cmhs": "v_cmhs", "cmtst": "v_cmtst",
+                   "cmle": "v_cmle", "cmlt": "v_cmlt"}
+        ACC3 = {"fmla": "v_fmla", "fmls": "v_fmls", "mla": "v_mla",
+                "mls": "v_mls"}
+
+        if m in FP_CMP and b_expr is not None and sfx:
+            self.em(f"V128 {out} = {FP_CMP[m]}_{sfx}({a}, {b_expr});")
+        elif m in INT_CMP and b_expr is not None:
+            self.em(f"V128 {out} = {INT_CMP[m]}_{self._lane_suffix(esz)}({a}, {b_expr});")
+        elif m in ACC3 and b_expr is not None and c_expr is not None:
+            self.em(f"V128 {out} = {ACC3[m]}_{sfx}({c_expr}, {a}, {b_expr});")
+        elif m in FP_BIN and b_expr is not None and sfx:
+            self.em(f"V128 {out} = {FP_BIN[m]}_{sfx}({a}, {b_expr});")
+        elif m in INT_BIN and b_expr is not None:
+            if m in ("and", "orr", "eor", "bic", "orn"):
+                # bitwise ops act on the whole 128-bit register; the header
+                # defines them unsuffixed (v_and/v_orr/v_eor/v_bic/v_orn).
+                self.em(f"V128 {out} = {INT_BIN[m]}({a}, {b_expr});")
+            else:
+                self.em(f"V128 {out} = {INT_BIN[m]}_{self._lane_suffix(esz)}({a}, {b_expr});")
+        elif m in ("fnm", "fms"):
+            # fnm vd, vn, vm = -(vn*vm) ; fms vd, vn, vm = -(vn*vm) + vd
+            t1 = self._newtmp(1)[0]
+            self.em(f"V128 {t1} = v_fmul_{sfx}({a}, {b_expr});")
+            z = self._newtmp(1)[0]
+            self._vzero(z)
+            t2 = self._newtmp(1)[0]
+            self.em(f"V128 {t2} = v_fsub_{sfx}({z}, {t1});")
+            if m == "fms" and c_expr is not None:
+                self.em(f"V128 {out} = v_fadd_{sfx}({t2}, {c_expr});")
+            else:
+                self.em(f"V128 {out} = {t2};")
+        elif m in ("fabs", "fneg", "fsqrt", "frecpe", "frsqrte") and sfx:
+            self.em(f"V128 {out} = v_{m}_{sfx}({a});")
+        elif m in ("scvtf", "ucvtf", "fcvtzs", "fcvtzu", "fcvtas", "fcvtau",
+                   "fcvtms", "fcvtmu", "fcvtns", "fcvtnu", "fcvtps", "fcvtpu"):
+            return self._vec_cvt(pc, m, rd, a, esz, lanes, imms)
+        elif m in ("frintn", "frintp", "frintm", "frintz", "frinta",
+                   "frintx", "frinti"):
+            self.em(f"V128 {out} = v_{m}_{sfx}({a});")
+        elif m in ("sxtl", "uxtl"):
+            self.em(f"V128 {out} = v_{'sshlll' if m == 'sxtl' else 'ushlll'}_"
+                    f"{self._lane_suffix(esz)}_{self._lane_suffix(esz // 2)}({a}, {esz * 4});")
+        else:
+            raise Unsupported(pc, 0, f"laneop '{m}'", m)
+        self._vst(rd, out, esz, lanes)
+
+    def _elem_expr(self, pc, t, esz, broadcast=False):
+        """Expression for an element operand; broadcast builds a V128."""
+        _, reg, echar, eidx = t
+        eesz = self.ARR_ESZ[echar]
+        si = self.ridx(reg)
+        off = eidx * eesz
+        if off + eesz <= 8:
+            val = f"((c->d[{si}] >> {off * 8}) & {(1 << (eesz * 8)) - 1:#x}ull)"
+        else:
+            val = f"((c->dhi[{si}] >> {(off - 8) * 8}) & {(1 << (eesz * 8)) - 1:#x}ull)"
+        if not broadcast:
+            return val
+        t_ = self._newtmp(1)[0]
+        lane_bits = eesz * 8
+        rep = sum(1 << (lane_bits * k) for k in range(64 // lane_bits))
+        self.em(f"V128 {t_}; {t_}.lo = ({val}) * {rep:#x}ull; {t_}.hi = {t_}.lo;")
+        return t_
+
+    def _vec_cvt(self, pc, m, rd, a, esz, lanes, imms):
+        """Vector FP<->int conversions (per-lane), incl. #fbits scaling.
+
+        `a` is a source token.  Only scvtf/ucvtf/fcvtzs/fcvtzu have helpers
+        in a64_ctx.h; the other rounding-mode variants stay gaps.
+        """
+        if a[0] == "v":
+            a = self._vld(self._newtmp(1)[0], a[1])
+        else:
+            a = self._elem_expr(pc, a, esz)
+        sfx = self._fp_suffix(esz)
+        out = self._newtmp(1)[0]
+        sh = imms[0][1] if imms else None
+        src = a
+        if sh is not None:
+            st = self._newtmp(1)[0]
+            if sfx == "f32":
+                self.em(f"V128 {st} = v_scalbn_f32({a}, {sh});")
+            else:
+                self.em(f"V128 {st} = v_scalbn_f64({a}, {sh});")
+            src = st
+        # int result -> lane suffix of the int side
+        if m.startswith("fcvt"):
+            isz = esz  # same lane width for fcvtzs/fcvtzu on same arrangement
+            fn = f"v_{m}_{self._lane_suffix(isz)}_{sfx}"
+            self.em(f"V128 {out} = {fn}({src});")
+        else:
+            fn = f"v_{m}_{sfx}_{self._lane_suffix(esz)}"
+            self.em(f"V128 {out} = {fn}({src});")
+        self._vst(rd, out, esz, lanes)
 
 
 def u32f(bits):

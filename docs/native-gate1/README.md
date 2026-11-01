@@ -80,3 +80,11 @@ No game files, no keys, no firmware in this folder. No launcher code changed.
 - New tools in git with this update: `tools/diag_9076.py` (2,520 B, 18:39) — 90763a0 diagnosis; `tools/diag_forms.py` (2,446 B, 20:20); `tools/census_forms.py` (4,503 B, 21:45) — census of SIMD/FP forms/sites.
 - No new run: gen.py unchanged 26,426 B (17:31), boot.log unchanged 73,548 B (18:30), exe unchanged 406,729,216 B (18:30), init 438, STOP still 90763a0, svc_count 0, no nnMain, no GetService.
 - Gate 1 still NOT passed — nnMain + GetService log still owed. Next step to watch for is a regen + rebuild + re-run from the new a64.py.
+
+## Update 2026-11-01 09:11 CST — C2440 SIMD header fix, no new run yet
+- After the 01:33 run (init 438, STOP 90763a0 dup), a later build failed with C2440 compile errors and left no exe — the 09:03 watch check found `build/splatnative.exe` absent. That failure is what this update fixes, not a new run.
+- Freebuff mapped 5 defect classes to exact emitter lines, verified them against the header (VTERN/VRED macro definitions, bitwise header block, bitwise emission region 2604-2680, every `v_eor / v_and / v_orn` site). Analysis: `src_esz * 2` is strictly correct for the mla fix (no narrowing works with `* 1`, header defines no equal-width pairs).
+- Applied: two a64.py emitter fixes, plus the missing header definitions the emitter calls but a64_ctx.h never defined — integer `mla / mls`, lane-suffixed `umaxv`, and 2-arg `uaddlv`.
+- Sizes in git with this update: `src/recomp/a64.py` 82,107 B -> 135,621 B (09:05), `src/runtime/a64_ctx.h` 12,118 B -> 84,698 B (09:11). SIMD gap census reported by Freebuff: classes cleared 1,168 -> 90 total.
+- Still no new run: boot.log still 53,609 B (01:33 run, init 438, STOP 90763a0), gen.py still 26,426 B, exe still absent at last check. Evidence: evidence/c2440_simd_header_fix_2026-11-01.md.
+- Gate 1 still NOT passed — nnMain + GetService log still owed. Next step is a full regen + build + run that clears C2440 and gets init past 438, with no [unmapped] on jump-table targets.
