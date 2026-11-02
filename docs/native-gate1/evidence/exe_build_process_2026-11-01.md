@@ -39,7 +39,7 @@ Documented, NOT pushed to GitHub. The exe binary itself is never pushed.
   - 85061e0 function: stores (x0,x1,x2) into 24-byte slot at begin+index*24, atomic ldaxr/stlxr increment at e50abc0, returns -1 on a legitimate branch — not a bug per se
   - Tail-branch alternative: last 85061e0 entry dispatched NOT via _call but via br xN / tail b trampoline `c->pc = 0x85061e0; return;` with x30 already 0; grep found tail branches in main_gen_000 without x30 set
   - Propagation: prologue saves x30, epilogue restores x30; if caller had x30=0 at entry (tail branch), 0 propagates through the chain
-  - Next precise step (queued for Freebuff, after she is done): log x30 and sp at every [init] entry as `[init] call <addr> x30=<hex> sp=<hex>`, dump 32 qwords of guest stack from sp-0x100 to 20fff000 on any [unmapped]/[undef] stop, write output to a timestamped file, plus after relocation list every GOT/PLT slot still 0 with symbol name, and disassemble 85061e0..8506280 to check adrp/ldr/br stubs vs real functions
+  - Next precise step (queued for Freebuff, after Freebuff is done): log x30 and sp at every [init] entry as `[init] call <addr> x30=<hex> sp=<hex>`, dump 32 qwords of guest stack from sp-0x100 to 20fff000 on any [unmapped]/[undef] stop, write output to a timestamped file, plus after relocation list every GOT/PLT slot still 0 with symbol name, and disassemble 85061e0..8506280 to check adrp/ldr/br stubs vs real functions
 
 ## What is NOT in this document / NOT pushed
 - No exe binary, no obj files, no build/gen/*.c content, no vendor LZ4, no __pycache__
