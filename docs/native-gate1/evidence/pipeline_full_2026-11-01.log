@@ -1,0 +1,222 @@
+=== full pipeline start Sun 11/01/2026 18:43:50.12 === 
+[cross] iter 1: fns=35 new_crossers=0
+[gen] rtld: 1 PLT stubs, 0 jump-table targets, 0 cross-range targets, 24 extra starts total
+[cross] iter 1: fns=54430 new_crossers=7912
+[cross] iter 2: fns=62342 new_crossers=2760
+[cross] iter 3: fns=65102 new_crossers=528
+[cross] iter 4: fns=65630 new_crossers=159
+[cross] iter 5: fns=65789 new_crossers=52
+[cross] iter 6: fns=65841 new_crossers=30
+[cross] iter 7: fns=65871 new_crossers=17
+[cross] iter 8: fns=65888 new_crossers=14
+[cross] iter 9: fns=65902 new_crossers=6
+[cross] iter 10: fns=65908 new_crossers=6
+[cross] iter 11: fns=65914 new_crossers=4
+[cross] iter 12: fns=65918 new_crossers=4
+[cross] iter 13: fns=65922 new_crossers=4
+[cross] iter 14: fns=65926 new_crossers=4
+[cross] iter 15: fns=65930 new_crossers=4
+[cross] iter 16: fns=65934 new_crossers=4
+[cross] iter 17: fns=65938 new_crossers=2
+[cross] iter 18: fns=65940 new_crossers=2
+[cross] iter 19: fns=65942 new_crossers=2
+[cross] iter 20: fns=65944 new_crossers=2
+[cross] iter 21: fns=65946 new_crossers=2
+[cross] iter 22: fns=65948 new_crossers=2
+[cross] iter 23: fns=65950 new_crossers=2
+[cross] iter 24: fns=65952 new_crossers=1
+[cross] iter 25: fns=65953 new_crossers=0
+[gen] sdk: 7832 PLT stubs, 14024 jump-table targets, 11523 cross-range targets, 45106 extra starts total
+[cross] iter 1: fns=320998 new_crossers=33554
+[cross] iter 2: fns=354552 new_crossers=13180
+[cross] iter 3: fns=367732 new_crossers=3327
+[cross] iter 4: fns=371059 new_crossers=855
+[cross] iter 5: fns=371914 new_crossers=208
+[cross] iter 6: fns=372122 new_crossers=91
+[cross] iter 7: fns=372213 new_crossers=33
+[cross] iter 8: fns=372246 new_crossers=19
+[cross] iter 9: fns=372265 new_crossers=15
+[cross] iter 10: fns=372280 new_crossers=11
+[cross] iter 11: fns=372291 new_crossers=7
+[cross] iter 12: fns=372298 new_crossers=4
+[cross] iter 13: fns=372302 new_crossers=3
+[cross] iter 14: fns=372305 new_crossers=3
+[cross] iter 15: fns=372308 new_crossers=1
+[cross] iter 16: fns=372309 new_crossers=0
+[gen] main: 1131 PLT stubs, 48372 jump-table targets, 51311 cross-range targets, 156755 extra starts total
+[gen] rtld: 33 FDEs, 3 dynsyms, base 0x8500000 ...
+[gen] rtld: full re-emit of 35 functions
+[gen] wrote E:\SplatNative\build\gen\rtld_gen_000.c (164024 B)
+[gen] rtld: gaps=0
+[gen] sdk: 32673 FDEs, 23066 dynsyms, base 0xe6fe000 ...
+[gen] sdk: full re-emit of 65953 functions
+[gen] wrote E:\SplatNative\build\gen\sdk_gen_000.c (13736471 B)
+[gen] wrote E:\SplatNative\build\gen\sdk_gen_001.c (11176734 B)
+[gen] wrote E:\SplatNative\build\gen\sdk_gen_002.c (10983119 B)
+[gen] wrote E:\SplatNative\build\gen\sdk_gen_003.c (16707441 B)
+[gen] wrote E:\SplatNative\build\gen\sdk_gen_004.c (22576925 B)
+[gen] wrote E:\SplatNative\build\gen\sdk_gen_005.c (10684291 B)
+[gen] wrote E:\SplatNative\build\gen\sdk_gen_006.c (12078486 B)
+[gen] wrote E:\SplatNative\build\gen\sdk_gen_007.c (12422779 B)
+[gen] wrote E:\SplatNative\build\gen\sdk_gen_008.c (3246798 B)
+[gen] wrote E:\SplatNative\build\gen\sdk_gen_009.c (9969732 B)
+[gen] wrote E:\SplatNative\build\gen\sdk_gen_010.c (1504041 B)
+[gen] sdk: gaps=69
+[gen] main: 271718 FDEs, 1293 dynsyms, base 0x8506000 ...
+[gen] main: full re-emit of 372309 functions
+[gen] wrote E:\SplatNative\build\gen\main_gen_000.c (21114019 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_001.c (14399773 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_002.c (13557436 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_003.c (15252917 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_004.c (10779366 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_005.c (20227450 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_006.c (7868575 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_007.c (17598019 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_008.c (13827473 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_009.c (15802183 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_010.c (20385208 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_011.c (19033795 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_012.c (21139770 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_013.c (29185922 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_014.c (24416822 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_015.c (24403464 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_016.c (23769139 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_017.c (14212986 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_018.c (11576483 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_019.c (18021089 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_020.c (15805771 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_021.c (26376536 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_022.c (22825894 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_023.c (27498997 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_024.c (20179153 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_025.c (33375975 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_026.c (37357069 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_027.c (28725142 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_028.c (27533564 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_029.c (25476348 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_030.c (21545247 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_031.c (24965539 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_032.c (22348261 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_033.c (29304824 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_034.c (21941206 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_035.c (26155368 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_036.c (34267513 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_037.c (29178543 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_038.c (26046352 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_039.c (31451357 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_040.c (35697732 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_041.c (20324850 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_042.c (29001930 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_043.c (24373884 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_044.c (23427252 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_045.c (27361554 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_046.c (19609964 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_047.c (25633978 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_048.c (26921142 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_049.c (26532845 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_050.c (26235162 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_051.c (26495866 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_052.c (26208880 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_053.c (22355631 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_054.c (17067554 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_055.c (23936039 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_056.c (39122467 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_057.c (26756625 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_058.c (4074745 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_059.c (31860794 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_060.c (27977911 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_061.c (23321949 B)
+[gen] wrote E:\SplatNative\build\gen\main_gen_062.c (78108 B)
+[gen] main: gaps=23
+[gen] wrote E:\SplatNative\build\gen\recomp_meta.c (28834350 B) patches=26162 host=20
+[gen] report: E:\SplatNative\build\gen\gen_report.json
+  rtld: fns=35 gaps=0 files=1 bytes=164024 gap_mnemonics=[]
+  sdk: fns=65953 gaps=69 files=11 bytes=125086817 gap_mnemonics=['aesmc', 'cmhi', 'fcvtl', 'pmull', 'prfum', 'rshrn', 'saddlp', 'saddw2', 'sha1c', 'sha256su0', 'sqadd', 'sqrshrn', 'sqrshrn2', 'sqsub', 'srshr', 'uabd', 'uaddl']
+  main: fns=372309 gaps=23 files=63 bytes=1443307410 gap_mnemonics=['facge', 'fmov', 'mov', 'sqincd', 'sqxtn2', 'sqxtun2', 'uaddl', 'uaddw2', 'umlsl']
+GEN_EXIT=0 
+[build] 80 translation units, jobs=6
+[build] ok main.c
+[build] ok a64_helpers.c
+[build] ok lz4.c
+[build] ok nso_loader.c
+[build] ok main_gen_004.c
+[build] ok main_gen_006.c
+[build] ok main_gen_007.c
+[build] ok main_gen_008.c
+[build] ok main_gen_005.c
+[build] 10/80 compiled
+[build] ok main_gen_000.c
+[build] ok main_gen_009.c
+[build] ok main_gen_010.c
+[build] ok main_gen_011.c
+[build] ok main_gen_012.c
+[build] ok main_gen_013.c
+[build] ok main_gen_017.c
+[build] ok main_gen_015.c
+[build] ok main_gen_018.c
+[build] 20/80 compiled
+[build] ok main_gen_020.c
+[build] ok main_gen_003.c
+[build] ok main_gen_022.c
+[build] ok main_gen_021.c
+[build] ok main_gen_024.c
+[build] ok main_gen_019.c
+[build] ok main_gen_001.c
+[build] ok main_gen_028.c
+[build] ok main_gen_029.c
+[build] 30/80 compiled
+[build] ok main_gen_026.c
+[build] ok main_gen_023.c
+[build] ok main_gen_032.c
+[build] ok main_gen_030.c
+[build] ok main_gen_034.c
+[build] ok main_gen_031.c
+[build] ok main_gen_025.c
+[build] ok main_gen_033.c
+[build] ok main_gen_037.c
+[build] 40/80 compiled
+[build] ok main_gen_016.c
+[build] ok main_gen_035.c
+[build] ok main_gen_039.c
+[build] ok main_gen_040.c
+[build] ok main_gen_038.c
+[build] ok main_gen_044.c
+[build] ok main_gen_046.c
+[build] ok main_gen_041.c
+[build] ok main_gen_049.c
+[build] 50/80 compiled
+[build] ok main_gen_043.c
+[build] ok main_gen_042.c
+[build] ok main_gen_052.c
+[build] ok main_gen_045.c
+[build] ok main_gen_051.c
+[build] ok main_gen_054.c
+[build] ok main_gen_050.c
+[build] ok main_gen_058.c
+[build] ok main_gen_057.c
+[build] 60/80 compiled
+[build] ok main_gen_047.c
+[build] ok main_gen_062.c
+[build] ok recomp_meta.c
+[build] ok rtld_gen_000.c
+[build] ok sdk_gen_000.c
+[build] ok main_gen_056.c
+[build] ok sdk_gen_001.c
+[build] ok sdk_gen_002.c
+[build] ok main_gen_059.c
+[build] 70/80 compiled
+[build] ok sdk_gen_003.c
+[build] ok sdk_gen_007.c
+[build] ok sdk_gen_006.c
+[build] ok sdk_gen_008.c
+[build] ok sdk_gen_010.c
+[build] ok main_gen_061.c
+[build] ok sdk_gen_009.c
+[build] ok sdk_gen_004.c
+[build] ok main_gen_060.c
+[build] 80/80 compiled
+[build] linking 80 objects ...
+[build] OK -> E:\SplatNative\build\splatnative.exe (460216832 B)
+BUILD_EXIT=0 
+RUN_EXIT=0 
+=== full pipeline end Sun 11/01/2026 19:53:50.16 === 

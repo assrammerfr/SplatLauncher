@@ -117,3 +117,10 @@ No game files, no keys, no firmware, no titlekeys, no NSO bytes, and no decrypte
 - Census5 (14:11, evidence/census5_2026-11-01.log): 9 TUs, main_gen_012.c / 013.c / 014.c / 015.c FAIL — a subset census, not the full 56-TU census, so it does not replace the 4-ok / 56-failing full census from earlier today.
 - Still no new run: boot.log still 53,609 B (01:33 run, init 438, STOP 90763a0 [undef] mn=dup, no nnMain, no GetService), exe still absent. No build/gen/*.c, obj, exe, vendor, or __pycache__ files are in this push — source and evidence only.
 - Gate 1 still NOT passed — nnMain + GetService log still owed. Next step is still a full regen + build + run that clears the 9 classes and gets init past 438.
+
+## Update 2026-11-01 21:25 CST — Exe built and run, init 5,640, new pc=0 stop
+- Exe built: `build/splatnative.exe` 460,216,832 B, 2026-11-01 19:53 PC time — first linked exe after the 09:03 C2440 failure where it was absent. The exe binary itself is NOT in this push; only its build process is documented in evidence/exe_build_process_2026-11-01.md.
+- Run: boot.log 324,251 B, 10,983 lines, fn table 438,297, init 438 -> 5,640 calls, then STOP at [unmapped] pc=0 after [init] call bee4480. Old blocker 90763a0 gone, no [crash]. Evidence: evidence/pipeline_full_2026-11-01.log (10,410 B, 19:53).
+- New diagnostic tool: tools/_decode_zero.py (2,425 B, 20:04) — parses the trace ring from boot.log to identify the pc=0 blocker.
+- Crash theory in progress: pc=0 and x30=0, sp=20fff000; 85061e0 is a real function (24-byte slot, atomic increment, -1 legitimate return), tail-branch dispatch without x30 set is the leading alternative to mid-frame overwrite, with x30=0 propagating through prologue/epilogue. Queued next test for Freebuff, after she is done: log x30/sp at every [init] entry, dump 32 qwords from sp-0x100 to 20fff000 on [unmapped]/[undef] stop, timestamped log file, plus GOT/PLT zero-slot list and 85061e0..8506280 disassembly check.
+- Gate 1 still NOT passed — nnMain + GetService log still owed.
