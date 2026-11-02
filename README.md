@@ -16,7 +16,7 @@ No game files, keys, or firmware are included in this repository. You must suppl
 ## Status
 
 - **Launcher:** scans folders by title ID, manages per-title profiles, and backs up and restores saves.
-- **Native runtime:** Gate 0 passed with constraints. Gate 1 is in progress — the current measured state is init 438 of 6,858, stopping at `90763a0` (`dup` SIMD gap), with no `nnMain` or `GetService` log yet. There is no playable build and no release.
+- **Native runtime:** Gate 0 passed with constraints. Gate 1 is in progress — the current measured state is init 6,858 of 6,858, `nnMain` reached, then crash `ca3e5ec`, with no `GetService` log yet. There is no playable build and no release.
 - **Release:** no binary release is available. A release follows Gate 1 (run to `nnMain` with a `GetService` log), Gate 2 (title and plaza rendering, measured against an emulator baseline), and Gate 3 (saves, DLC, and launcher integration, tested), in that order.
 
 ## Features

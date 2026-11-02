@@ -8,10 +8,10 @@ SplatNative is a title-specific static recompilation of Splatoon 3 (A64 to C to 
 | --- | --- |
 | Gate 1 pass bar | Recompiled rtld, main, and SDK run to `nnMain` with a `GetService` enumeration log |
 | Gate 1 | Not passed |
-| Latest run | 2026-11-01 01:33 — init 438 of 6,858, stopping at `90763a0` (`dup` SIMD gap), no `nnMain`, no `GetService` |
-| Current work | Build-blocking SIMD emitter fixes: 9 classes across 56 failing translation units, ~2,291 errors (see the 2026-11-01 entries in the progress log). Midday source growth: a64.py 136,486 B (12:00), a64_ctx.h 89,777 B (12:27), PC CPU at 98-100% with the builder dominant at 14:10-14:25 |
-| Build state | No executable at last check (14:35) — the previous build failed with C2440 errors and did not link, and no new build has linked yet |
-| Next step | Full regeneration, build, and run that clears the build errors and moves init past 438, with no `[unmapped]` on jump-table targets |
+| Latest run | 2026-11-02 01:02 — init 6,858 of 6,858, `nnMain` reached at `c934940`, then crash `ca3e5ec`, no `GetService` |
+| Current work | `ca3e5ec` crash investigation, in progress 2026-11-02 morning: scan 2 cleared state on branches and was judged too aggressive, so its field-0 result was treated as unreliable; the re-run uses scan 1's state retention plus the field-0 filter, and checks the `nso_scan` symbol API in parallel |
+| Build state | Executable linked 2026-11-02 01:02, 463,000,576 B (binary itself is never committed; see `FILES.md`) |
+| Next step | Get past the post-`nnMain` crash to a `GetService` enumeration log — that, with `nnMain`, is the Gate 1 pass bar |
 
 ## Contents
 
@@ -124,3 +124,23 @@ No game files, no keys, no firmware, no titlekeys, no NSO bytes, and no decrypte
 - New diagnostic tool: tools/_decode_zero.py (2,425 B, 20:04) — parses the trace ring from boot.log to identify the pc=0 blocker.
 - Crash theory in progress: pc=0 and x30=0, sp=20fff000; 85061e0 is a real function (24-byte slot, atomic increment, -1 legitimate return), tail-branch dispatch without x30 set is the leading alternative to mid-frame overwrite, with x30=0 propagating through prologue/epilogue. Queued next test for the builder, after the builder is done: log x30/sp at every [init] entry, dump 32 qwords from sp-0x100 to 20fff000 on [unmapped]/[undef] stop, timestamped log file, plus GOT/PLT zero-slot list and 85061e0..8506280 disassembly check.
 - Gate 1 still NOT passed — nnMain + GetService log still owed.
+
+## Update 2026-11-01 23:33 CST — init 6,493, first [crash], caa1968
+- Run: boot.log 404,791 B, 13,265 lines, exe 460,255,744 B (2026-11-01 22:22 PC time). Init 5,640 -> 6,493 calls, no FAILED line, then [crash] code=c0000005 fault=0x78 guest_pc=caa1968 sp=20ffef10, svc_count=0, undef=0, followed by a 1,024-entry trace ring.
+- Previous blockers gone: pc=0 (0 occurrences), 90763a0 (0), ecb0cd4 (0). No [unmapped], no [undef], no nnMain, no GetService. This was the first [crash] terminator in any watched boot.log.
+- Evidence: evidence/runs_2026-11-01_22_to_2026-11-02_02.md.
+- Gate 1 still NOT passed — nnMain + GetService log still owed.
+
+## Update 2026-11-02 01:03 CST — first nnMain entry, crash eb068f4
+- Run: boot.log 431,983 B, 14,117 lines, exe 462,999,552 B (2026-11-01 23:51 PC time). Init 6,493 -> 6,858 (full), last init d390540, then line 13072 `[boot] calling entry nnMain at c934940` — the first nnMain entry in any watched boot.log.
+- Immediately after nnMain: [crash] code=c0000005 fault=0x0 guest_pc=eb068f4 sp=20ffee60, svc_count=0, undef=0, followed by a 1,024-entry trace ring. Previous crash caa1968 gone (0), pc=0 (0), 90763a0 (0).
+- No GetService (0), no [unmapped] (0), no STOP (0). Gate 1 requires nnMain AND a GetService log, so this is progress, not a pass.
+- Evidence: evidence/runs_2026-11-01_22_to_2026-11-02_02.md.
+- Gate 1 still NOT passed — GetService log still owed.
+
+## Update 2026-11-02 02:03 CST — nnMain again, new crash ca3e5ec
+- Run: boot.log 432,132 B, 14,119 lines, exe 463,000,576 B (2026-11-02 01:02 PC time). Init 6,858 (full, same count), then line 13074 `[boot] calling entry nnMain at c934940`, then [crash] code=c0000005 fault=0x68 guest_pc=ca3e5ec sp=20ffedc0 x30=ca31300, svc_count=0, undef=0, followed by a 1,024-entry trace ring.
+- Previous crash eb068f4 gone (0), caa1968 (0), pc=0 (0), 90763a0 (0). No GetService (0), no [unmapped] (0), no STOP (0), [crash] count 20.
+- Watch note: `src/runtime/main.c` on the PC grew 8,381 B -> 10,847 B for this run, and `src/recomp/a64.py` on the PC was reported at 139,519 B (2026-11-01 22:49). Neither file could be copied into this repo for this push — remote copy to the PC was unavailable from 02:33 CST onward (transport failure, not a build failure) — so the repo source snapshots still show the 2026-11-01 19:44 sizes, and only the run numbers above are new here. No exe, obj, or generated C is committed.
+- Current work, 2026-11-02 morning (builder chat, not disk-verified): re-investigating ca3e5ec with scan 1 state retention plus the field-0 filter, after scan 2's state-clearing was judged too aggressive.
+- Gate 1 still NOT passed — nnMain reached, GetService log still owed.
