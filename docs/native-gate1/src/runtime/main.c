@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
     if (!g_log) g_log = stderr;
     SetUnhandledExceptionFilter(on_crash);
 
-    LOGF("[boot] SplatNative first runnable unit - builder: Freebuff\n");
+    LOGF("[boot] SplatNative first runnable unit - builder: local build\n");
     LOGF("[boot] modules: rtld @ 0x08500000, sdk @ 0x0e6fe000, main @ 0x08506000\n");
 
     /* map modules at the absolute addresses from the Ryujinx boot log.

@@ -5,7 +5,7 @@ fn table 438,383, init 438 of 6,858, STOP [undef] pc=90763a0 then
 [unmapped] pc=90763a0, FAILED rc=-1, svc_count=0, undef=2, no nnMain,
 no GetService.
 
-Classification (Freebuff, 18:48, from the 18:30 boot.log numbers):
+Classification (the builder, 18:48, from the 18:30 boot.log numbers):
 90763a0 is `dup v0.2s, w9` — NEON SIMD, #1 in the main gap list
 (dup x1,083 there). The emitter hit an unsupported mnemonic, emitted
 `a64_undef`, and mid-function resume dispatched to nothing. Stop class

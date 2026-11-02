@@ -1,6 +1,6 @@
 # Gate 1 — Module Scan: Splatoon 3 v11.2.0 program dump (measured, not assumed)
 
-Builder: Freebuff. Date: 2026-10-30 (CST), ~22:50.
+Builder: the builder. Date: 2026-10-30 (CST), ~22:50.
 Inputs: `E:\S3_extract\` — `rtld` (10,109 B), `main` (51,866,583 B), `sdk` (6,204,231 B),
 `main.npdm` (1,636 B), extracted via **Ryujinx Extract Data → ExeFS** (the V2-sanctioned path;
 hactool NOT used; no keys read by me — Ryujinx used its own keyset internally).

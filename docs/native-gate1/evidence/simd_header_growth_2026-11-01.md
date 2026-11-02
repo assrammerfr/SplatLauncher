@@ -11,7 +11,7 @@ aabe68c), verified from disk on the PC at 14:25-14:27:
 - `src/recomp/a64.py`: 135,621 B -> 136,486 B, 2026-11-01 12:00
 - `src/runtime/a64_ctx.h`: 84,698 B -> 89,777 B, 2026-11-01 12:27
 
-PC CPU was at 98-100% at 14:10-14:25 with Freebuff processes
+PC CPU was at 98-100% at 14:10-14:25 with the builder processes
 dominant, consistent with an in-progress regeneration/build, but
 no linked executable existed at the 14:25 check, so no new boot
 log exists to judge yet.

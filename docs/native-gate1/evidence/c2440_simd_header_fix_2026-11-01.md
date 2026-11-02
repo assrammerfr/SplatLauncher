@@ -7,7 +7,7 @@ Build failure after that run: C2440 compile errors, no link, no exe.
 The 09:03 watch check verified build/splatnative.exe ABSENT on the PC.
 No new boot.log was produced by the failed build.
 
-Fix work, verified from disk at push time (Freebuff, MiMo v2.6 Flash Fast):
+Fix work, verified from disk at push time (the builder, MiMo v2.6 Flash Fast):
 - 5 defect classes mapped to exact emitter lines.
 - Read before editing: VTERN/VRED macro definitions (mla / umaxv / uaddlv
   header fixes), bitwise header block, bitwise emission region 2604-2680
@@ -18,7 +18,7 @@ Fix work, verified from disk at push time (Freebuff, MiMo v2.6 Flash Fast):
   a64_ctx.h for three classes the emitter calls but the header never
   defined: integer mla / mls, lane-suffixed umaxv, and 2-arg uaddlv.
   Single-line anchors used to match the CRLF file safely.
-- SIMD gap census reported by Freebuff: classes cleared 1,168 -> 90 total.
+- SIMD gap census reported by the builder: classes cleared 1,168 -> 90 total.
 - Sizes: src/recomp/a64.py 135,621 B at 09:05, src/runtime/a64_ctx.h
   84,698 B at 09:11. gen.py unchanged 26,426 B. boot.log unchanged
   53,609 B (01:33 run). exe absent at last check.

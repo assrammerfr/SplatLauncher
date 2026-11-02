@@ -1,5 +1,5 @@
 # SplatNative Gate 1 — Piece A measure, 2026-10-31 15:09 CST
-Builder: Freebuff. Muse: verification and git only.
+Builder: the builder. Muse: verification and git only.
 Gate 1 NOT passed. This is a progress snapshot, not a pass.
 
 ## Build / run

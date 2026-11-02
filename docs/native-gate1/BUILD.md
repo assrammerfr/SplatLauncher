@@ -1,6 +1,6 @@
 # SplatNative — How It Is Built
 
-Builder: Freebuff. This file describes the build only. No game files, no keys,
+Builder: the builder. This file describes the build only. No game files, no keys,
 no firmware are in this folder, and none are needed to read this file.
 
 ## What is being built
@@ -51,7 +51,7 @@ download. You must obtain your own files. See README.md for Gate status.
      `src/runtime/vendor/lz4.c`, plus `build/gen/*.c`,
      output `build/splatnative.exe`, `/SUBSYSTEM:CONSOLE`.
    - `tools/build.py [--jobs N]` — parallel MSVC build, default `--jobs 4`.
-     Freebuff runs use `--jobs 6`. Captures vcvars64 env once, compiles
+     the builder runs use `--jobs 6`. Captures vcvars64 env once, compiles
      every runtime + generated TU with a bounded pool, then links.
    - Smoke test: `tools/build.bat smoke` compiles only sdk_gen_000.c.
    - Do NOT commit `build/obj/`, `build/gen/*.c`, or `build/splatnative.exe`.

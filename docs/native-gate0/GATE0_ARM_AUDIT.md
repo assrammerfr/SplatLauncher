@@ -1,6 +1,6 @@
 # Gate 0 — ARM Path Audit: SplatNative (Splatoon 3 native compatibility runtime)
 
-Builder: **Freebuff** (this audit is Freebuff's work; not Copilot, not Claude, not Terra, not Muse)
+Builder: **the builder** (this audit is the builder's work; not Copilot, not the reviewer, not the other builder, not Muse)
 Date: 2026-10-30 (CST), audit run started 22:20 CST
 Tree: **`E:\SplatNative\`** (docs\, evidence\, src\ — separate from `E:\splatlauncher\` and `F:\PinyonShift\work`)
 Target: **Splatoon 3 v11.2.0, title 0100C2500FC20000** (Splatoon 2 is follow-on; see §8)
@@ -300,7 +300,7 @@ blocked-on-pipeline-design, not on any missing input.
 **BLOCKED by policy (hard stops, not gate failures):** online/NPLN/Pia play, firmware inputs,
 bundled keys/firmware/game files in the tree (this tree contains none — only my docs, this audit,
 and a Ryujinx log with no keys in it), Splatoon 2 scope, Switch 2/other consoles, the parked Order
-Shot mod (not touched), Fatlindi's UI (not touched), Pinyon trees (not touched).
+Shot mod (not touched), the UI contributor's UI (not touched), Pinyon trees (not touched).
 
 **RISK (not blocked):** see §9.
 
@@ -309,7 +309,7 @@ Shot mod (not touched), Fatlindi's UI (not touched), Pinyon trees (not touched).
 ## 8. Reuse report — what prior builders' work covers (per prompt: reuse, don't rebuild, don't claim)
 
 ### 8.1 sp2decomp (the repo in `E:\Splatoon Games\sp2decomp`, GitHub bangmcpe3321/sp2decomp)
-This is **Splatoon 2** work (the prompt attributes the blocked S2 DX12 effort to Terra's Gate 0).
+This is **Splatoon 2** work (the prompt attributes the blocked S2 DX12 effort to the other builder's Gate 0).
 I did not rebuild any of it and I do not claim it. What it gives us:
 
 - **Reused as reference (read-only):** `RECOMP_ASSESSMENT.md` (WonderRecomp architecture + license
@@ -374,5 +374,5 @@ screenshot + log + CSV (honest FPS, even if low).
 - No keys, firmware, titlekeys, or game files read or copied. `prod.keys` location was observed in
   a directory listing only; the file was never opened.
 - hactool not re-run; no extraction re-run; Order Shot mod untouched; live saves untouched;
-  Pinyon / FH2 launcher / Fatlindi UI / SplatLaunch code untouched (SplatLaunch workspace only listed).
-- Builder credit: **Freebuff**.
+  Pinyon / FH2 launcher / the UI contributor UI / SplatLaunch code untouched (SplatLaunch workspace only listed).
+- Builder credit: **the builder**.

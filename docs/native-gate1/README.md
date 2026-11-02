@@ -9,7 +9,7 @@ SplatNative is a title-specific static recompilation of Splatoon 3 (A64 to C to 
 | Gate 1 pass bar | Recompiled rtld, main, and SDK run to `nnMain` with a `GetService` enumeration log |
 | Gate 1 | Not passed |
 | Latest run | 2026-11-01 01:33 — init 438 of 6,858, stopping at `90763a0` (`dup` SIMD gap), no `nnMain`, no `GetService` |
-| Current work | Build-blocking SIMD emitter fixes: 9 classes across 56 failing translation units, ~2,291 errors (see the 2026-11-01 entries in the progress log). Midday source growth: a64.py 136,486 B (12:00), a64_ctx.h 89,777 B (12:27), PC CPU at 98-100% with Freebuff dominant at 14:10-14:25 |
+| Current work | Build-blocking SIMD emitter fixes: 9 classes across 56 failing translation units, ~2,291 errors (see the 2026-11-01 entries in the progress log). Midday source growth: a64.py 136,486 B (12:00), a64_ctx.h 89,777 B (12:27), PC CPU at 98-100% with the builder dominant at 14:10-14:25 |
 | Build state | No executable at last check (14:35) — the previous build failed with C2440 errors and did not link, and no new build has linked yet |
 | Next step | Full regeneration, build, and run that clears the build errors and moves init past 438, with no `[unmapped]` on jump-table targets |
 
@@ -87,33 +87,33 @@ No game files, no keys, no firmware, no titlekeys, no NSO bytes, and no decrypte
 - Measure: fn table 411,370 -> 438,383 (+27,013), init 17 -> 438. ec7d294, ecccc48, and e8aa4b4 STOPs all gone.
 - New STOP, much later: [undef] pc=90763a0 word=0 mn=dup -> STOP, then [unmapped] pc=90763a0 not in fn table, [init] FAILED rc=-1, svc_count=0, undef=2.
 - gen.py 24,851 -> 26,426 B (17:31), gen_report.json 7,949 -> 8,047 B (17:46). Evidence: evidence/e8aa4b4_fix_1830_run_2026-10-31.md. Generated recomp_meta.c (28,839,782 B) NOT uploaded.
-- This run met the Freebuff V4 build watch stop condition (new STOP with init past 17). Watch reported once and is done; removal is the project owner's call.
+- This run met the the builder V4 build watch stop condition (new STOP with init past 17). Watch reported once and is done; removal is the project owner's call.
 - Gate 1 still NOT passed — nnMain + GetService log still owed.
 
 ## Update 2026-10-31 23:39 CST — emitter coverage work, no new run yet
 - Blocker class after 18:30: emitter instruction coverage, not missing-function discovery. STOP 90763a0 is `dup v0.2s, w9` (NEON SIMD) — the emitter hit an unsupported mnemonic, emitted `a64_undef`, and mid-function resume dispatched to nothing. Quantified from the 18:30 run: ~75 SIMD/FP mnemonics, 14,917 sites (fsub x3,860, fmul x2,778, dup x1,850 total sites), init 438 of 6,858 (6.4%).
-- Freebuff is now editing the emitter itself: `src/recomp/a64.py` 69,757 B -> 81,494 B at 21:39, then 82,107 B at 23:39 (+12,350 B total). This push snapshots the 23:39 a64.py; it was still being edited at push time, so a later edit may supersede it before the next run.
+- the builder is now editing the emitter itself: `src/recomp/a64.py` 69,757 B -> 81,494 B at 21:39, then 82,107 B at 23:39 (+12,350 B total). This push snapshots the 23:39 a64.py; it was still being edited at push time, so a later edit may supersede it before the next run.
 - New tools in git with this update: `tools/diag_9076.py` (2,520 B, 18:39) — 90763a0 diagnosis; `tools/diag_forms.py` (2,446 B, 20:20); `tools/census_forms.py` (4,503 B, 21:45) — census of SIMD/FP forms/sites.
 - No new run: gen.py unchanged 26,426 B (17:31), boot.log unchanged 73,548 B (18:30), exe unchanged 406,729,216 B (18:30), init 438, STOP still 90763a0, svc_count 0, no nnMain, no GetService.
 - Gate 1 still NOT passed — nnMain + GetService log still owed. Next step to watch for is a regen + rebuild + re-run from the new a64.py.
 
 ## Update 2026-11-01 09:11 CST — C2440 SIMD header fix, no new run yet
 - After the 01:33 run (init 438, STOP 90763a0 dup), a later build failed with C2440 compile errors and left no exe — the 09:03 watch check found `build/splatnative.exe` absent. That failure is what this update fixes, not a new run.
-- Freebuff mapped 5 defect classes to exact emitter lines, verified them against the header (VTERN/VRED macro definitions, bitwise header block, bitwise emission region 2604-2680, every `v_eor / v_and / v_orn` site). Analysis: `src_esz * 2` is strictly correct for the mla fix (no narrowing works with `* 1`, header defines no equal-width pairs).
+- the builder mapped 5 defect classes to exact emitter lines, verified them against the header (VTERN/VRED macro definitions, bitwise header block, bitwise emission region 2604-2680, every `v_eor / v_and / v_orn` site). Analysis: `src_esz * 2` is strictly correct for the mla fix (no narrowing works with `* 1`, header defines no equal-width pairs).
 - Applied: two a64.py emitter fixes, plus the missing header definitions the emitter calls but a64_ctx.h never defined — integer `mla / mls`, lane-suffixed `umaxv`, and 2-arg `uaddlv`.
-- Sizes in git with this update: `src/recomp/a64.py` 82,107 B -> 135,621 B (09:05), `src/runtime/a64_ctx.h` 12,118 B -> 84,698 B (09:11). SIMD gap census reported by Freebuff: classes cleared 1,168 -> 90 total.
+- Sizes in git with this update: `src/recomp/a64.py` 82,107 B -> 135,621 B (09:05), `src/runtime/a64_ctx.h` 12,118 B -> 84,698 B (09:11). SIMD gap census reported by the builder: classes cleared 1,168 -> 90 total.
 - Still no new run: boot.log still 53,609 B (01:33 run, init 438, STOP 90763a0), gen.py still 26,426 B, exe still absent at last check. Evidence: evidence/c2440_simd_header_fix_2026-11-01.md.
 - Gate 1 still NOT passed — nnMain + GetService log still owed. Next step is a full regen + build + run that clears C2440 and gets init past 438, with no [unmapped] on jump-table targets.
 
 ## Update 2026-11-01 14:35 CST — SIMD emitter work continues, no new run yet
 - The 09:11 view was incomplete: a full MSVC census after that fix found 4 translation units ok, 56 failing, ~2,291 errors, ~9 distinct root causes — not just the 5 defect classes mapped at 09:11. Current work is fixing those 9 build-blocker classes: fcvtzs/scvff signed suffix, faddp/fmaxp/fminp naming, fmul broadcast, shsub widths, frecpe/frsqrte/frint, sli/sri arguments, fabd floating-point, and the `__fm` redeclaration.
 - Source growth since 09:11, verified from disk on the PC: `src/recomp/a64.py` 135,621 B -> 136,486 B (12:00), `src/runtime/a64_ctx.h` 84,698 B -> 89,777 B (12:27). Sizes in git with this update match the PC at the 14:35 check.
-- Still no new run: boot.log still 53,609 B (01:33 run, init 438, STOP 90763a0), gen.py still 26,426 B, exe still absent at the 14:35 check. PC CPU was at 98-100% at 14:10-14:25 with Freebuff processes dominant, consistent with an in-progress regeneration/build, but no linked executable exists yet to judge.
+- Still no new run: boot.log still 53,609 B (01:33 run, init 438, STOP 90763a0), gen.py still 26,426 B, exe still absent at the 14:35 check. PC CPU was at 98-100% at 14:10-14:25 with the builder processes dominant, consistent with an in-progress regeneration/build, but no linked executable exists yet to judge.
 - Evidence: evidence/simd_header_growth_2026-11-01.md.
 - Gate 1 still NOT passed — nnMain + GetService log still owed. Next step is a full regen + build + run that clears the 9 classes and gets init past 438, with no [unmapped] on jump-table targets.
 
-## Update 2026-11-01 19:44 CST — Freebuff pipeline run 18:43, source growth, no new run yet
-- Freebuff ran again at 18:43 PC time (pipeline_full.log 57 B, a64.py / a64_ctx.h timestamps 18:43:22-23). Source growth verified from disk on the PC and copied to git here: `src/recomp/a64.py` 136,486 B -> 136,812 B, `src/runtime/a64_ctx.h` 89,777 B -> 90,806 B.
+## Update 2026-11-01 19:44 CST — the builder pipeline run 18:43, source growth, no new run yet
+- the builder ran again at 18:43 PC time (pipeline_full.log 57 B, a64.py / a64_ctx.h timestamps 18:43:22-23). Source growth verified from disk on the PC and copied to git here: `src/recomp/a64.py` 136,486 B -> 136,812 B, `src/runtime/a64_ctx.h` 89,777 B -> 90,806 B.
 - Census5 (14:11, evidence/census5_2026-11-01.log): 9 TUs, main_gen_012.c / 013.c / 014.c / 015.c FAIL — a subset census, not the full 56-TU census, so it does not replace the 4-ok / 56-failing full census from earlier today.
 - Still no new run: boot.log still 53,609 B (01:33 run, init 438, STOP 90763a0 [undef] mn=dup, no nnMain, no GetService), exe still absent. No build/gen/*.c, obj, exe, vendor, or __pycache__ files are in this push — source and evidence only.
 - Gate 1 still NOT passed — nnMain + GetService log still owed. Next step is still a full regen + build + run that clears the 9 classes and gets init past 438.
@@ -122,5 +122,5 @@ No game files, no keys, no firmware, no titlekeys, no NSO bytes, and no decrypte
 - Exe built: `build/splatnative.exe` 460,216,832 B, 2026-11-01 19:53 PC time — first linked exe after the 09:03 C2440 failure where it was absent. The exe binary itself is NOT in this push; only its build process is documented in evidence/exe_build_process_2026-11-01.md.
 - Run: boot.log 324,251 B, 10,983 lines, fn table 438,297, init 438 -> 5,640 calls, then STOP at [unmapped] pc=0 after [init] call bee4480. Old blocker 90763a0 gone, no [crash]. Evidence: evidence/pipeline_full_2026-11-01.log (10,410 B, 19:53).
 - New diagnostic tool: tools/_decode_zero.py (2,425 B, 20:04) — parses the trace ring from boot.log to identify the pc=0 blocker.
-- Crash theory in progress: pc=0 and x30=0, sp=20fff000; 85061e0 is a real function (24-byte slot, atomic increment, -1 legitimate return), tail-branch dispatch without x30 set is the leading alternative to mid-frame overwrite, with x30=0 propagating through prologue/epilogue. Queued next test for Freebuff, after Freebuff is done: log x30/sp at every [init] entry, dump 32 qwords from sp-0x100 to 20fff000 on [unmapped]/[undef] stop, timestamped log file, plus GOT/PLT zero-slot list and 85061e0..8506280 disassembly check.
+- Crash theory in progress: pc=0 and x30=0, sp=20fff000; 85061e0 is a real function (24-byte slot, atomic increment, -1 legitimate return), tail-branch dispatch without x30 set is the leading alternative to mid-frame overwrite, with x30=0 propagating through prologue/epilogue. Queued next test for the builder, after the builder is done: log x30/sp at every [init] entry, dump 32 qwords from sp-0x100 to 20fff000 on [unmapped]/[undef] stop, timestamped log file, plus GOT/PLT zero-slot list and 85061e0..8506280 disassembly check.
 - Gate 1 still NOT passed — nnMain + GetService log still owed.

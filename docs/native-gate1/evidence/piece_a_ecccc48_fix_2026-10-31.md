@@ -1,5 +1,5 @@
 # SplatNative Gate 1 — Piece A ecccc48 fix, 2026-10-31 16:00-16:54 CST
-Builder: Freebuff. Muse: verification and git only.
+Builder: the builder. Muse: verification and git only.
 Gate 1 NOT passed. No new run yet at push time — this is a diagnosis + fix snapshot, not a run result.
 
 ## Diagnosis (verified from disk)
@@ -18,7 +18,7 @@ Gate 1 NOT passed. No new run yet at push time — this is a diagnosis + fix sna
 ## Build in progress at push time
 - 76 sources total, 62 compiled, 5 in flight, 9 queued, remaining ~15 shards, obj count 67 files / 498,403,438 B.
 - Pathological TUs: main_gen_001 at 75 min, still CPU-active; twin main_gen_002 finished at 16:51 after 70 min. Slow big TUs, not a deadlock — all 6 cl.exe CPU-active, pool cycling.
-- Freebuff estimate at 16:54: link ~30-60 min out, then re-run.
+- the builder estimate at 16:54: link ~30-60 min out, then re-run.
 - Boot.log and exe are still the 15:09 run (5,858 B / 396,281,344 B) until that re-run lands.
 
 ## Next
