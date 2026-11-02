@@ -1657,9 +1657,37 @@ static inline V128 v_saddlv_u32(V128 a, int n) { V128 r; int32_t x[4]; int64_t s
 /* ---- pairwise across the whole register, scalar dest (FADDP Sd, Vn.2S) ---- */
 static inline float v_faddp_pair_s(V128 a) { float x[2]; memcpy(x, &a, 8); return x[0] + x[1]; }
 
-/* ---- SCVTF/UCVTF with immediate fraction bits (scalar) ---- */
-static inline float v_scalbn_f32(float x, int e) { return scalbnf(x, e); }
-static inline double v_scalbn_f64(double x, int e) { return scalbn(x, e); }
+/* ---- FCVTZS/SCVTF with immediate fraction bits: per-lane scalbn ---- */
+static inline V128 v_scalbn_f32(V128 a, int e) {
+    V128 r; int i; r.lo = 0; r.hi = 0;
+    for (i = 0; i < 4; i++) { float x;
+        memcpy(&x, (const char*)&a + i * 4, 4);
+        x = scalbnf(x, e);
+        memcpy((char*)&r + i * 4, &x, 4); }
+    return r; }
+static inline V128 v_scalbn_f64(V128 a, int e) {
+    V128 r; int i; r.lo = 0; r.hi = 0;
+    for (i = 0; i < 2; i++) { double x;
+        memcpy(&x, (const char*)&a + i * 8, 8);
+        x = scalbn(x, e);
+        memcpy((char*)&r + i * 8, &x, 8); }
+    return r; }
+
+/* ---- SQSHL by immediate: per-lane signed saturating shift left ---- */
+static inline V128 v_sqshl_u32(V128 a, int n) {
+    V128 r; int i; r.lo = 0; r.hi = 0;
+    for (i = 0; i < 4; i++) {
+        int32_t x; int64_t v;
+        memcpy(&x, (const char*)&a + i * 4, 4);
+        if (n <= 0) v = x;
+        else if (x == 0) v = 0;
+        else if (n >= 32) v = (x > 0) ? INT32_MAX : INT32_MIN;
+        else { v = (int64_t)x << n;
+            if (v > INT32_MAX) v = INT32_MAX;
+            else if (v < INT32_MIN) v = INT32_MIN; }
+        { int32_t y = (int32_t)v; memcpy((char*)&r + i * 4, &y, 4); }
+    }
+    return r; }
 
 /* ---- FMOV vector immediates (broadcast of a 64-bit pattern) ---- */
 static inline V128 v_fmov_imm_u64(uint64_t bits) { V128 r; r.lo = bits; r.hi = bits; return r; }

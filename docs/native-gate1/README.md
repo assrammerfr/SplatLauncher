@@ -111,3 +111,9 @@ No game files, no keys, no firmware, no titlekeys, no NSO bytes, and no decrypte
 - Still no new run: boot.log still 53,609 B (01:33 run, init 438, STOP 90763a0), gen.py still 26,426 B, exe still absent at the 14:35 check. PC CPU was at 98-100% at 14:10-14:25 with Freebuff processes dominant, consistent with an in-progress regeneration/build, but no linked executable exists yet to judge.
 - Evidence: evidence/simd_header_growth_2026-11-01.md.
 - Gate 1 still NOT passed — nnMain + GetService log still owed. Next step is a full regen + build + run that clears the 9 classes and gets init past 438, with no [unmapped] on jump-table targets.
+
+## Update 2026-11-01 19:44 CST — Freebuff pipeline run 18:43, source growth, no new run yet
+- Freebuff ran again at 18:43 PC time (pipeline_full.log 57 B, a64.py / a64_ctx.h timestamps 18:43:22-23). Source growth verified from disk on the PC and copied to git here: `src/recomp/a64.py` 136,486 B -> 136,812 B, `src/runtime/a64_ctx.h` 89,777 B -> 90,806 B.
+- Census5 (14:11, evidence/census5_2026-11-01.log): 9 TUs, main_gen_012.c / 013.c / 014.c / 015.c FAIL — a subset census, not the full 56-TU census, so it does not replace the 4-ok / 56-failing full census from earlier today.
+- Still no new run: boot.log still 53,609 B (01:33 run, init 438, STOP 90763a0 [undef] mn=dup, no nnMain, no GetService), exe still absent. No build/gen/*.c, obj, exe, vendor, or __pycache__ files are in this push — source and evidence only.
+- Gate 1 still NOT passed — nnMain + GetService log still owed. Next step is still a full regen + build + run that clears the 9 classes and gets init past 438.

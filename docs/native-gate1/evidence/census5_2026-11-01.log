@@ -1,0 +1,26 @@
+=== census5 start Sun 11/01/2026 14:11:03.84 === 
+[census] 9 TUs
+[census] main_gen_012.c: FAIL
+[census] main_gen_013.c: FAIL
+[census] main_gen_014.c: FAIL
+[census] main_gen_015.c: FAIL
+[census] sdk_gen_003.c: FAIL
+
+== RESULT: 4 ok, 5 fail ==
+   123  v_addp_u8  C2198
+          main_gen_012.c:274380: V128 __t6_0 = v_addp_u8(__t4_0, __t5_0);
+          main_gen_012.c:274384: V128 __t9_0 = v_addp_u8(__t7_0, __t8_0);
+    88  v_scalbn_f32  C2440
+          sdk_gen_003.c:202353: V128 __t13_0 = v_scalbn_f32(__t11_0, 16);
+          sdk_gen_003.c:202353: V128 __t13_0 = v_scalbn_f32(__t11_0, 16);
+    19  v_addp_u32  C2198
+          main_gen_014.c:347636: V128 __t24_0 = v_addp_u32(__t22_0, __t23_0);
+          main_gen_014.c:347644: V128 __t27_0 = v_addp_u32(__t25_0, __t26_0);
+    13  v_sqshl_u32  C2440
+          sdk_gen_003.c:202357: V128 __t15_0 = v_sqshl_u32(__t14_0, 8);
+          sdk_gen_003.c:206657: V128 __t18_0 = v_sqshl_u32(__t17_0, 8);
+     8  v_sminp_u32  C2198
+          main_gen_014.c:347674: V128 __t37_0 = v_sminp_u32(__t35_0, __t36_0);
+          main_gen_014.c:347992: V128 __t124_0 = v_sminp_u32(__t122_0, __t123_0);
+CENSUS5_EXIT=0 
+=== census5 end Sun 11/01/2026 14:11:14.32 === 

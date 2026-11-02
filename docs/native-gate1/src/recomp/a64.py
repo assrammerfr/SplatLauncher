@@ -2310,7 +2310,7 @@ class FnEmitter:
             self.em(f"{out}.lo = (uint64_t)(uint32_t)f32b({fn}({a}));")
         elif m in ("faddp", "fmaxp", "fminp", "addp") and rd[:1] == "d":
             fn = {"faddp": "v_faddp_scalar_d", "fmaxp": "v_fmaxp_scalar_d",
-                  "fminp": "v_fminp_scalar_d", "addp": "v_addp_scalar_d"}[m]
+                  "fminp": "v_fminp_scalar_d", "addp": "v_addp_scalar_d_u64"}[m]
             self.em(f"V128 {out}; {out}.lo = {fn}({a}); {out}.hi = 0;")
         elif m == "addp" and rd[:1] == "w":
             self.em(f"V128 {out}; {out}.lo = (uint64_t)(uint32_t)(a.lo + a.hi);")
@@ -2818,6 +2818,11 @@ class FnEmitter:
                 # bitwise ops act on the whole 128-bit register; the header
                 # defines them unsuffixed (v_and/v_orr/v_eor/v_bic/v_orn).
                 self.em(f"V128 {out} = {INT_BIN[m]}({a}, {b_expr});")
+            elif m in ("addp", "smaxp", "umaxp", "sminp", "uminp"):
+                # pairwise ops (VADDPAIR/VPAIRMAXMIN) take the active lane
+                # count as the third argument.
+                self.em(f"V128 {out} = {INT_BIN[m]}_{self._lane_suffix(esz)}"
+                        f"({a}, {b_expr}, {lanes});")
             else:
                 self.em(f"V128 {out} = {INT_BIN[m]}_{self._lane_suffix(esz)}({a}, {b_expr});")
         elif m in ("fnm", "fms"):
