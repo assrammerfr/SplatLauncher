@@ -8,10 +8,10 @@ SplatNative is a title-specific static recompilation of Splatoon 3 (A64 to C to 
 | --- | --- |
 | Gate 1 pass bar | Recompiled rtld, main, and SDK run to `nnMain` with a `GetService` enumeration log |
 | Gate 1 | **Passed 2026-11-03 14:26 PC time** — `nnMain` + `GetService('fsp-srv')` in the same run log |
-| Latest run | 2026-11-03 14:26 — init 6,858 of 6,858, `nnMain` reached at `c934940`, `GetService('fsp-srv') via 'sm:' -> h=1001`, svc_count 11, crashes 0; run still ends at BREAK `e79bb18` after GetService |
-| Current work | Gate 2: title / plaza draw + CSV, starting from the post-GetService BREAK at `e79bb18` |
-| Build state | Executable linked 2026-11-03 14:26, 463,009,792 B (binary itself is never committed; see `FILES.md`) |
-| Next step | Get past the post-GetService BREAK at `e79bb18` to a title / plaza draw, with a CSV produced from that draw — that is the Gate 2 pass bar |
+| Latest run | 2026-11-03 16:27 — init 6,861, `nnMain` reached at `c934940`, `GetService('fsp-srv') -> h=1001`, `GetService('apm') -> h=1002`, `GetService('appletOE') -> h=1003`, svc_count 25, crashes 0 until new crash `e8d070c`; old BREAK `e79bb18` absent (0 occurrences) |
+| Current work | Gate 2: title / plaza draw + CSV, starting from the new crash at `e8d070c` |
+| Build state | Executable linked 2026-11-03 16:27, 465,902,592 B (binary itself is never committed; see `FILES.md`) |
+| Next step | Diagnose the `e8d070c` crash at its root cause, then get to a title / plaza draw, with a CSV produced from that draw — that is the Gate 2 pass bar |
 
 ## Contents
 
@@ -158,3 +158,11 @@ No game files, no keys, no firmware, no titlekeys, no NSO bytes, and no decrypte
 - Source sync: `src/recomp/a64.py` unchanged since the 940c88a push (139,519 B, hash verified against the PC copy). `src/runtime/main.c` on the PC is now 15,377 B (2026-11-03 07:58), but it is NOT in this push: the PC copy still contains a builder name in a log string (line 152), and builder names are not committed to this public repo. That file stays private until the log string is scrubbed to a neutral term. Runtime source snapshots in this repo therefore remain the older copies; only the README status and the Gate 1 pass evidence are new here.
 - No exe, obj, or generated C is committed.
 - Gate 1 PASSED. Next gate: title / plaza draw + CSV.
+
+## Update 2026-11-03 16:27 PC time — Gate 2 progress: BREAK e79bb18 cleared, new crash e8d070c
+- Run: `boot_20261103_162739.log`, 428,872 B, 8,383 lines, exe 465,902,592 B (2026-11-03 16:27 PC time). Init 6,861, `[boot] calling entry nnMain at c934940`, `GetService('fsp-srv') -> h=1001`, `GetService('apm') -> h=1002`, `GetService('appletOE') -> h=1003`, svc_count 25, undef 0.
+- Old post-GetService BREAK `e79bb18`: 0 occurrences — cleared, after being present in the Gate 1 pass run (svc_count 11) and in every run up to 15:57 the same day (svc_count 14, fsp-srv only).
+- New stop: `[crash] code=c0000005 fault=0 guest_pc=e8d070c sp=20ffedc0`, `x30=e8d070c`. Full evidence: `evidence/run_2026-11-03_gate2_progress.md`.
+- Source on the PC at this run: `main.c` 19,789 B, `a64_helpers.c` 30,087 B, but `main.c` is NOT in this push: the PC copy still contains a builder name in a log string, and builder names are not committed to this public repo. Runtime source snapshots here therefore remain the older copies; only the README status and the Gate 2 progress evidence are new here.
+- No exe, obj, or generated C is committed.
+- Gate 2 still NOT passed — no draw, no CSV yet. Next step is diagnosing `e8d070c`, then a title / plaza draw + CSV in the same run.
