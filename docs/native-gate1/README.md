@@ -8,9 +8,9 @@ SplatNative is a title-specific static recompilation of Splatoon 3 (A64 to C to 
 | --- | --- |
 | Gate 1 pass bar | Recompiled rtld, main, and SDK run to `nnMain` with a `GetService` enumeration log |
 | Gate 1 | Not passed |
-| Latest run | 2026-11-02 01:02 — init 6,858 of 6,858, `nnMain` reached at `c934940`, then crash `ca3e5ec`, no `GetService` |
+| Latest run | 2026-11-02 08:17 — init 6,858 of 6,858, `nnMain` reached at `c934940`, then crash `ca3e5ec`, no `GetService` |
 | Current work | `ca3e5ec` crash investigation, in progress 2026-11-02 morning: scan 2 cleared state on branches and was judged too aggressive, so its field-0 result was treated as unreliable; the re-run uses scan 1's state retention plus the field-0 filter, and checks the `nso_scan` symbol API in parallel |
-| Build state | Executable linked 2026-11-02 01:02, 463,000,576 B (binary itself is never committed; see `FILES.md`) |
+| Build state | Executable linked 2026-11-02 08:17, 463,000,576 B (binary itself is never committed; see `FILES.md`) |
 | Next step | Get past the post-`nnMain` crash to a `GetService` enumeration log — that, with `nnMain`, is the Gate 1 pass bar |
 
 ## Contents
@@ -143,4 +143,10 @@ No game files, no keys, no firmware, no titlekeys, no NSO bytes, and no decrypte
 - Previous crash eb068f4 gone (0), caa1968 (0), pc=0 (0), 90763a0 (0). No GetService (0), no [unmapped] (0), no STOP (0), [crash] count 20.
 - Watch note: `src/runtime/main.c` on the PC grew 8,381 B -> 10,847 B for this run, and `src/recomp/a64.py` on the PC was reported at 139,519 B (2026-11-01 22:49). Neither file could be copied into this repo for this push — remote copy to the PC was unavailable from 02:33 CST onward (transport failure, not a build failure) — so the repo source snapshots still show the 2026-11-01 19:44 sizes, and only the run numbers above are new here. No exe, obj, or generated C is committed.
 - Current work, 2026-11-02 morning (builder chat, not disk-verified): re-investigating ca3e5ec with scan 1 state retention plus the field-0 filter, after scan 2's state-clearing was judged too aggressive.
+- Gate 1 still NOT passed — nnMain reached, GetService log still owed.
+
+## Update 2026-11-02 08:17 CST — nnMain again, same crash ca3e5ec, source sync
+- Run: boot.log 166,734 B, 7,951 lines, exe 463,000,576 B (2026-11-02 08:17 PC time, exe size unchanged from 01:02). Init 6,858 (full, same count), nnMain reached, then [crash] code=c0000005 fault=0x68 guest_pc=ca3e5ec, svc_count=0, no GetService, no [unmapped]. Same crash address as 01:02, smaller boot.log — a re-run, not a new crash.
+- Source sync, verified from disk on the PC: `src/recomp/a64.py` 136,812 B -> 139,519 B (2026-11-01 22:49 PC time), now in git here. `src/runtime/main.c` on the PC is 10,919 B (2026-11-02 08:10), but it is NOT in this push: the PC copy contains a builder name in a log string, and builder names are not committed to this public repo. That file stays private until the log string is scrubbed to a neutral term.
+- No exe, obj, or generated C is committed.
 - Gate 1 still NOT passed — nnMain reached, GetService log still owed.

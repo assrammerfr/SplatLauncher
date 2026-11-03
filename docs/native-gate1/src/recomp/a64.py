@@ -915,6 +915,17 @@ class FnEmitter:
         rhs_tok = rhs
         if rhs[0] == "imm":
             v = rhs[1]
+            # capstone puts `#imm, lsl #n` (the `sub sp, sp, #1, lsl #12`
+            # >4KB-frame pattern) in the IMMEDIATE operand's shift field.
+            # Dropping it shrinks the frame (0x811 instead of 0x1810) and
+            # overlaps locals onto the saved registers.
+            i = getattr(self, "_cur_insn", None)
+            if i is not None:
+                ridx = 1 if (m in ("cmp", "cmn") or len(ops) < 3) else 2
+                if ridx < len(i.operands):
+                    sh = i.operands[ridx].shift
+                    if sh.type == ARM64_SFT_LSL and sh.value:
+                        v = v << sh.value
             b = f"({v:#x}ull)" if not w else f"({v & 0xFFFFFFFF:#x}u)"
             if neg:
                 b = f"(-({v:#x}ull))" if not w else f"(-({v & 0xFFFFFFFF:#x}u))"
@@ -962,19 +973,21 @@ class FnEmitter:
                         f"(uint64_t)(int64_t)(int8_t)(uint8_t)({b})"
                     if w:
                         b = f"(uint32_t)({b})"
+        # rhs[0]=="imm" must use v (shift applied above), not rhs[1]:
+        # `sub sp, sp, #1, lsl #12` has raw imm 1, shifted value 0x1000.
         if rhs[0] == "imm" and neg:
-            expr = f"({a} - ({rhs[1]:#x}ull))" if not w else f"(uint32_t)({a} - ({rhs[1] & 0xFFFFFFFF:#x}u))"
+            expr = f"({a} - ({v:#x}ull))" if not w else f"(uint32_t)({a} - ({v & 0xFFFFFFFF:#x}u))"
         elif rhs[0] == "imm":
             sign = "+" if is_add else "-"
-            expr = f"({a} {sign} {rhs[1]:#x}ull)" if not w else f"(uint32_t)({a} {sign} {rhs[1] & 0xFFFFFFFF:#x}u)"
+            expr = f"({a} {sign} {v:#x}ull)" if not w else f"(uint32_t)({a} {sign} {v & 0xFFFFFFFF:#x}u)"
         else:
             sign = "-" if is_sub else "+"
             expr = f"({a} {sign} {b})" if not w else f"(uint32_t)({a} {sign} {b})"
         if setflags:
             if is_sub or neg:
-                self._flags_sublike(a, b if rhs[0] == "reg" else f"({rhs[1]:#x}ull)", w)
+                self._flags_sublike(a, b if rhs[0] == "reg" else f"({v:#x}ull)", w)
             else:
-                self._flags_add(a, b if rhs[0] == "reg" else f"({rhs[1]:#x}ull)", w)
+                self._flags_add(a, b if rhs[0] == "reg" else f"({v:#x}ull)", w)
         if m not in ("cmp", "cmn"):
             sp = rd.lower() in ("sp", "wsp") or rn.lower() in ("sp", "wsp")
             self.put(self.wr(rd, expr, w, sp=sp))
@@ -1408,32 +1421,74 @@ class FnEmitter:
         mem = mm[1]
         self._cur_insn = i
         addr = self._mem_expr(mem, i, ops)
+        bname = i.reg_name(mem.base)
+        breg = self.ridx(bname) if bname.lower() not in ("xzr", "wzr") else None
+        pre = i.op_str.rstrip().endswith("]!")
+        post = ", [" in i.op_str and "], #" in i.op_str
+        imm = ops[3][1] if (post and len(ops) > 3 and ops[3][0] == "imm") else mem.disp
+
+        def writeback(a):
+            if not breg:
+                return
+            if pre:
+                self.em(f"c->x[{breg}] = {a};")
+            elif post:
+                self.em(f"c->x[{breg}] = ({a} + ({imm}));")
+
+        # SIMD/FP pair: operands are V128 registers, not GPRs. wr()/rd()
+        # would route d1 to c->x[1] (observed: ldp d1,d2,[x0,#0x60] emitted
+        # as integer x1/x2 loads, so the consumer read stale c->d[]).
+        if r1[:1] in ("q", "d", "s", "v") or r2[:1] in ("q", "d", "s", "v"):
+            cls = r1[:1] if r1[:1] in ("q", "d", "s") else "d"
+            esz = {"q": 16, "s": 4}.get(cls, 8)
+            self.em("{ uint64_t __a = (uint64_t)(" + addr + ");")
+            for n, r in ((0, r1), (1, r2)):
+                off = "__a" if n == 0 else f"(__a + {esz})"
+                idx = self.ridx(r)
+                if load:
+                    if cls == "q":
+                        self.em(f"c->d[{idx}] = ld64(c, {off});")
+                        self.em(f"c->dhi[{idx}] = ld64(c, ({off} + 8));")
+                    elif cls == "s":
+                        self.em(f"c->d[{idx}] = (c->d[{idx}] & ~0xffffffffull) | "
+                                f"(uint64_t)(uint32_t)ld32(c, {off});")
+                    else:
+                        self.em(f"c->d[{idx}] = ld64(c, {off});")
+                else:
+                    if cls == "q":
+                        self.em(f"st64(c, {off}, c->d[{idx}]);")
+                        self.em(f"st64(c, ({off} + 8), c->dhi[{idx}]);")
+                    elif cls == "s":
+                        self.em(f"st32(c, {off}, (uint32_t)c->d[{idx}]);")
+                    else:
+                        self.em(f"st64(c, {off}, c->d[{idx}]);")
+            writeback("__a")
+            self.em("}")
+            return
         w1 = self.is_w(r1)
-        esz = 32 if w1 else 64
         if load:
+            # Materialize the address once: dest1 may alias the base
+            # register (ldp x0, x1, [x0, #imm]); re-evaluating addr after
+            # the first write reads the loaded value as a pointer
+            # (observed fault: second half became [0+0x78]).
+            self.em("{ uint64_t __a = (uint64_t)(" + addr + ");")
             if m == "ldpsw":
-                self.put(self.wr(r1, f"(int64_t)(int32_t)ld32(c, {addr})"))
-                self.put(self.wr(r2, f"(int64_t)(int32_t)ld32(c, ({addr} + 4))"))
+                self.put(self.wr(r1, "(int64_t)(int32_t)ld32(c, __a)"))
+                self.put(self.wr(r2, "(int64_t)(int32_t)ld32(c, (__a + 4))"))
             else:
                 f = "ld32" if w1 else "ld64"
                 ext = "(uint64_t)(uint32_t)" if w1 else ""
-                self.put(self.wr(r1, f"{ext}{f}(c, {addr})", w1))
-                self.put(self.wr(r2, f"{ext}{f}(c, ({addr} + {4 if w1 else 8}))", w1))
+                self.put(self.wr(r1, f"{ext}{f}(c, __a)", w1))
+                self.put(self.wr(r2, f"{ext}{f}(c, (__a + {4 if w1 else 8}))", w1))
+            writeback("__a")
+            self.em("}")
         else:
             f = "st32" if w1 else "st64"
             v1 = self.rd(r1, w1) if r1.lower() not in ("wzr", "xzr") else ("0u" if w1 else "0ull")
             v2 = self.rd(r2, w1) if r2.lower() not in ("wzr", "xzr") else ("0u" if w1 else "0ull")
             self.em(f"{f}(c, {addr}, {v1});")
             self.em(f"{f}(c, ({addr} + {4 if w1 else 8}), {v2});")
-        base = self.rd(i.reg_name(mem.base), False)
-        bname = i.reg_name(mem.base)
-        breg = self.ridx(bname) if bname.lower() not in ("xzr", "wzr") else None
-        if breg:
-            if i.op_str.rstrip().endswith("]!"):
-                self.em(f"c->x[{breg}] = {addr};")  # pre-index
-            elif ", [" in i.op_str and "], #" in i.op_str:
-                imm = ops[3][1] if len(ops) > 3 and ops[3][0] == "imm" else mem.disp
-                self.em(f"c->x[{breg}] = ({base} + ({imm}));")
+            writeback(addr)
 
     def _atomic(self, pc, m, ops, i):
         # single-threaded bring-up: exclusives / ordered accesses become
