@@ -7,11 +7,11 @@ SplatNative is a title-specific static recompilation of Splatoon 3 (A64 to C to 
 | Item | State |
 | --- | --- |
 | Gate 1 pass bar | Recompiled rtld, main, and SDK run to `nnMain` with a `GetService` enumeration log |
-| Gate 1 | Not passed |
-| Latest run | 2026-11-02 08:17 — init 6,858 of 6,858, `nnMain` reached at `c934940`, then crash `ca3e5ec`, no `GetService` |
-| Current work | `ca3e5ec` crash investigation, in progress 2026-11-02 morning: scan 2 cleared state on branches and was judged too aggressive, so its field-0 result was treated as unreliable; the re-run uses scan 1's state retention plus the field-0 filter, and checks the `nso_scan` symbol API in parallel |
-| Build state | Executable linked 2026-11-02 08:17, 463,000,576 B (binary itself is never committed; see `FILES.md`) |
-| Next step | Get past the post-`nnMain` crash to a `GetService` enumeration log — that, with `nnMain`, is the Gate 1 pass bar |
+| Gate 1 | **Passed 2026-11-03 14:26 PC time** — `nnMain` + `GetService('fsp-srv')` in the same run log |
+| Latest run | 2026-11-03 14:26 — init 6,858 of 6,858, `nnMain` reached at `c934940`, `GetService('fsp-srv') via 'sm:' -> h=1001`, svc_count 11, crashes 0; run still ends at BREAK `e79bb18` after GetService |
+| Current work | Gate 2: title / plaza draw + CSV, starting from the post-GetService BREAK at `e79bb18` |
+| Build state | Executable linked 2026-11-03 14:26, 463,009,792 B (binary itself is never committed; see `FILES.md`) |
+| Next step | Get past the post-GetService BREAK at `e79bb18` to a title / plaza draw, with a CSV produced from that draw — that is the Gate 2 pass bar |
 
 ## Contents
 
@@ -150,3 +150,11 @@ No game files, no keys, no firmware, no titlekeys, no NSO bytes, and no decrypte
 - Source sync, verified from disk on the PC: `src/recomp/a64.py` 136,812 B -> 139,519 B (2026-11-01 22:49 PC time), now in git here. `src/runtime/main.c` on the PC is 10,919 B (2026-11-02 08:10), but it is NOT in this push: the PC copy contains a builder name in a log string, and builder names are not committed to this public repo. That file stays private until the log string is scrubbed to a neutral term.
 - No exe, obj, or generated C is committed.
 - Gate 1 still NOT passed — nnMain reached, GetService log still owed.
+
+## Update 2026-11-03 14:26 PC time — Gate 1 PASSED
+- Run: `boot_20261103_142644.log`, 403,031 B, 8,171 lines, exe 463,009,792 B (2026-11-03 14:26 PC time). Init 6,858 (full), `[boot] calling entry nnMain at c934940`, `[svc] GetService('fsp-srv') via 'sm:' -> h=1001`, svc_count 11 (histogram #00d:1, #00f:1, #010:1, #01f:1, #021:5, #026:1, #029:1), crashes 0, undef 0, `svcCreateThread (#8)` 0.
+- Gate 1 pass bar is met: `nnMain` and a guest-driven `GetService` enumeration line are in the same run log. Full evidence: `evidence/run_2026-11-03_gate1_pass.md`.
+- The run still ends at `[svc] BREAK x0=0 x1=20ffed98 x2=4 x3=0 x4=20ffed98 x30=e79bb18`, then `[done] pc=dead0000dead0000 svc_count=11`. That post-GetService BREAK does not undo the pass; it is the first Gate 2 blocker.
+- Source sync: `src/recomp/a64.py` unchanged since the 940c88a push (139,519 B, hash verified against the PC copy). `src/runtime/main.c` on the PC is now 15,377 B (2026-11-03 07:58), but it is NOT in this push: the PC copy still contains a builder name in a log string (line 152), and builder names are not committed to this public repo. That file stays private until the log string is scrubbed to a neutral term. Runtime source snapshots in this repo therefore remain the older copies; only the README status and the Gate 1 pass evidence are new here.
+- No exe, obj, or generated C is committed.
+- Gate 1 PASSED. Next gate: title / plaza draw + CSV.
