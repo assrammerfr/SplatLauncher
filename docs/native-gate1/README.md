@@ -8,10 +8,10 @@ SplatNative is a title-specific static recompilation of Splatoon 3 (A64 to C to 
 | --- | --- |
 | Gate 1 pass bar | Recompiled rtld, main, and SDK run to `nnMain` with a `GetService` enumeration log |
 | Gate 1 | **Passed 2026-11-03 14:26 PC time** — `nnMain` + `GetService('fsp-srv')` in the same run log |
-| Latest run | 2026-11-04 00:41 — `nnMain` reached at `c934940`, `GetService('fsp-srv') -> h=1001` only, ends at BREAK `e79bb18`, svc_count 31, clean exit; appletOE reply loop from the 00:27/00:33 runs is gone |
-| Current work | Gate 2: title / plaza draw + CSV, starting from BREAK `e79bb18` again |
-| Build state | Executable linked 2026-11-04 00:42, 706,793,984 B (binary itself is never committed; see `FILES.md`) |
-| Next step | Get past BREAK `e79bb18` to a title / plaza draw, with a CSV produced from that draw — that is the Gate 2 pass bar |
+| Latest run (Gate 1) | 2026-11-03 14:26 — see the Gate 1 pass update below. Gate 2 runs live in `docs/native-gate2/`, not here |
+| Current work | Gate 1 is done. Gate 2 work continues in `docs/native-gate2/` |
+| Build state | Gate 1 pass build: executable linked 2026-11-03 14:26, 463,009,792 B (binary itself is never committed; see `FILES.md`). Current Gate 2 build state is in `docs/native-gate2/` |
+| Next step | Gate 2: see `docs/native-gate2/` for the current blocker and pass bar |
 
 ## Contents
 
@@ -159,18 +159,6 @@ No game files, no keys, no firmware, no titlekeys, no NSO bytes, and no decrypte
 - No exe, obj, or generated C is committed.
 - Gate 1 PASSED. Next gate: title / plaza draw + CSV.
 
-## Update 2026-11-03 16:27 PC time — Gate 2 progress: BREAK e79bb18 cleared, new crash e8d070c
-- Run: `boot_20261103_162739.log`, 428,872 B, 8,383 lines, exe 465,902,592 B (2026-11-03 16:27 PC time). Init 6,861, `[boot] calling entry nnMain at c934940`, `GetService('fsp-srv') -> h=1001`, `GetService('apm') -> h=1002`, `GetService('appletOE') -> h=1003`, svc_count 25, undef 0.
-- Old post-GetService BREAK `e79bb18`: 0 occurrences — cleared, after being present in the Gate 1 pass run (svc_count 11) and in every run up to 15:57 the same day (svc_count 14, fsp-srv only).
-- New stop: `[crash] code=c0000005 fault=0 guest_pc=e8d070c sp=20ffedc0`, `x30=e8d070c`. Full evidence: `evidence/run_2026-11-03_gate2_progress.md`.
-- Source on the PC at this run: `main.c` 19,789 B, `a64_helpers.c` 30,087 B, but `main.c` is NOT in this push: the PC copy still contains a builder name in a log string, and builder names are not committed to this public repo. Runtime source snapshots here therefore remain the older copies; only the README status and the Gate 2 progress evidence are new here.
-- No exe, obj, or generated C is committed.
-- Gate 2 still NOT passed — no draw, no CSV yet. Next step is diagnosing `e8d070c`, then a title / plaza draw + CSV in the same run.
+## Gate 2
 
-## Update 2026-11-04 00:41 PC time — Gate 2 progress: appletOE loop fixed, back to BREAK e79bb18
-- Runs since the 16:27 push: 22:17 crash `e847628` (svc_count 20, no nnMain/GetService); 22:24 BREAK `e79bb18` (svc_count 21); 22:25 full-trace-sized log with nnMain 0, GetService 0; 00:27 and 00:33 runs reaching nnMain + GetService x3 (fsp-srv, apm, appletOE) then stalling in a runaway appletOE svc-reply loop (~490/513 MB logs, no done, no crash); 00:32 crash `e8513f8` (svc_count 26, GetService 0).
-- Latest run: `boot_20261104_004123.log`, 432,049 B, 2026-11-04 00:41 PC time. `[boot] calling entry nnMain at c934940`, `[svc] GetService('fsp-srv') -> h=1001` only, zero appletOE/apm lines, ends at BREAK `e79bb18` then `[done] svc_count=31`, exit. Full evidence: `evidence/run_2026-11-04_gate2_progress.md`.
-- Reading: the appletOE loop is fixed — this run terminates cleanly instead of ballooning to ~500 MB — but it is back at the old BREAK and does not reach apm/appletOE, romfs, a draw, or a CSV.
-- Source on the PC at this run: `main.c` 25,442 B, but `main.c` is NOT in this push: the PC copy still contains a builder name in a log string, and builder names are not committed to this public repo. Runtime source snapshots here therefore remain the older copies; only the README status and the Gate 2 progress evidence are new here.
-- No exe, obj, or generated C is committed.
-- Gate 2 still NOT passed — no draw, no CSV yet. Next step is getting past BREAK `e79bb18`, then a title / plaza draw + CSV in the same run.
+Gate 2 progress moved to `docs/native-gate2/` on 2026-11-04. Gate 2 updates are no longer recorded in this folder; this folder ends at the Gate 1 pass.
