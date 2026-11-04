@@ -100,14 +100,53 @@ void a64_hit_watch(A64Ctx* c) {
     }
 }
 
+static unsigned char g_cov_seen[0x20000];
+void a64_cov_hit(A64Ctx* c) {
+    extern uint64_t g_cov_lo;
+    uint64_t rel = c->pc - g_cov_lo;
+    if (rel >= 0x20000ull) return;
+    if (g_cov_seen[rel]) return;
+    g_cov_seen[rel] = 1;
+    lg("[cov] %llx\n", (unsigned long long)c->pc);
+}
+
+void a64_mark_hit(A64Ctx* c) {
+    lg("[mark] pc=%llx x0=%llx x1=%llx x2=%llx x3=%llx x30=%llx sp=%llx\n",
+       (unsigned long long)c->pc, (unsigned long long)c->x[0],
+       (unsigned long long)c->x[1], (unsigned long long)c->x[2],
+       (unsigned long long)c->x[3], (unsigned long long)c->x[30],
+       (unsigned long long)c->x[29]);
+    a64_dump_trace();
+    lg("[mark] stop at probe pc\n[done] exit\n");
+    fflush(g_log);
+    ExitProcess(0);
+}
+
+void a64_dump_bigtrace(unsigned n) {
+    extern uint64_t g_bigtrace[65536];
+    extern unsigned g_bigtrace_i;
+    unsigned total = g_bigtrace_i;
+    unsigned k;
+    if (n > 65536u) n = 65536u;
+    if (n > total) n = total;
+    lg("[big] last %u dispatches\n", n);
+    for (k = 0; k < n; k++)
+        lg("[big]   %llx\n",
+           (unsigned long long)g_bigtrace[(total - n + k) & 0xffffu]);
+}
+
 void a64_dump_trace(void) {
     unsigned total = g_trace_i;
     const char* all = getenv("SN_TRACE_ALL");
+    /* fn_dispatch writes into a 1024-entry ring (index & 1023), so read the
+       ring back with the same mask: the old dump walked the 262144-entry
+       buffer from the top and printed stale zeros. */
     unsigned cap = all ? 262144u : 1024u;
     unsigned n = total < cap ? total : cap;
     lg("[trace] last %u fn entries (oldest first):\n", n);
     for (unsigned k = 0; k < n; k++) {
-        unsigned idx = (total - n + k) & 262143u;
+        unsigned idx = all ? ((total - n + k) & 262143u)
+                           : ((total - n + k) & 1023u);
         lg("[trace]   %llx\n", (unsigned long long)g_trace[idx]);
     }
 }
@@ -243,6 +282,48 @@ static void gh_hipc_fill_reply(A64Ctx* c, uint64_t buf, int reqpkt, uint32_t obj
         lg("[svc]   reply packet also at tls+0x%x (state %02x/%02x)\n",
            rp, (unsigned)g_hipc_state[0x21], (unsigned)g_hipc_state[0x29]);
     }
+}
+
+/* Where does the client decode the reply magic?  nn::sf re-parses the echoed
+   hipc header with sdk 0xe799a5c, which stores a packed HeaderInfo at
+   struct+0x1a; its top byte (struct+0x21) is the word count the client scales
+   by 4 and rounds up, and it then reads the CMIF magic at +0x10.  Compute that
+   offset from the header we actually sealed instead of guessing, so messages
+   with session handles and plain ones both land where the client looks. */
+static int gh_hipc_reply_base(A64Ctx* c, uint64_t buf) {
+    uint32_t n;
+    int base;
+    memset(g_hipc_state, 0, sizeof(g_hipc_state));
+    gh_call(c, 0xe799a5cull, (uint64_t)(uintptr_t)g_hipc_state, buf);
+    n = (uint32_t)g_hipc_state[0x21];
+    base = (int)(((n << 2) + 0xfu) & ~0xfu);
+    if (base < 0 || base > 0x3c0) base = 0;
+    return base;
+}
+
+/* Replicates the client-side reply check exactly: nn::sf's cmif reader
+   (sdk 0xe7c44c4 / 0xe7992a0) re-parses the buffer with 0xe799a5c, takes the
+   message pointer at state+0x00 and the word count at state+0x21, then reads
+   the reply magic from align16(ptr + count*4) + 0x10 and compares it with
+   0x4f434653, returning 0x1a80a when it does not match.  Log and return that
+   address as an offset from the message buffer, so replies land where the
+   client actually looks instead of where we assume it looks. */
+static int gh_hipc_magic_off(A64Ctx* c, uint64_t buf) {
+    uint64_t ptr, a;
+    uint32_t n, magic;
+    int off;
+    memset(g_hipc_state, 0, sizeof(g_hipc_state));
+    gh_call(c, 0xe799a5cull, (uint64_t)(uintptr_t)g_hipc_state, buf);
+    ptr = *(uint64_t*)(const void*)g_hipc_state;
+    n = (uint32_t)g_hipc_state[0x21];
+    a = (ptr + (uint64_t)n * 4ull + 0xfull) & ~0xfull;
+    magic = IsBadReadPtr((const void*)(uintptr_t)(a + 0x10), 4)
+            ? 0xdeadbeefu : *(uint32_t*)(const void*)(uintptr_t)(a + 0x10);
+    off = (int)(a - buf);
+    lg("[hipc] magic lookup: ptr=%llx n=%u magic_at=%llx (tls+%x) magic=%08x%s\n",
+       (unsigned long long)ptr, (unsigned)n, (unsigned long long)(a + 0x10), off,
+       magic, magic == 0x4f434653u ? " OK" : "");
+    return off;
 }
 
 /* Offset from the message buffer where the client expects the reply packet. */
@@ -520,6 +601,59 @@ static unsigned g_ipc_dump_count(const char* nm) {
 }
 
 
+
+/* ---- romfs content model -------------------------------------------------
+   `rom:` is served from the local extracted tree (SN_ROMFS, default
+   E:\\Splatoon Games). The mount-cache answer the guest asks for is derived
+   from that real tree - entry counts and byte totals measured once - instead
+   of a made-up constant. No game bytes are read here, only directory entries.
+   ------------------------------------------------------------------------- */
+static const char* g_romfs_root;
+static uint64_t g_romfs_files, g_romfs_dirs, g_romfs_bytes, g_romfs_meta;
+
+static void gh_romfs_walk(const char* dir, int depth) {
+    char pat[1024];
+    WIN32_FIND_DATAA fd;
+    HANDLE h;
+    if (depth > 24) return;
+    snprintf(pat, sizeof pat, "%s\\*", dir);
+    h = FindFirstFileA(pat, &fd);
+    if (h == INVALID_HANDLE_VALUE) return;
+    do {
+        char sub[1024];
+        if (!strcmp(fd.cFileName, ".") || !strcmp(fd.cFileName, "..")) continue;
+        snprintf(sub, sizeof sub, "%s\\%s", dir, fd.cFileName);
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            g_romfs_dirs++;
+            gh_romfs_walk(sub, depth + 1);
+        } else {
+            g_romfs_files++;
+            g_romfs_bytes += ((uint64_t)fd.nFileSizeHigh << 32) | fd.nFileSizeLow;
+        }
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+}
+
+static uint64_t gh_romfs_meta_size(void) {
+    static int done = 0;
+    if (done) return g_romfs_meta;
+    done = 1;
+    if (!g_romfs_root) {
+        const char* e = getenv("SN_ROMFS");
+        g_romfs_root = (e && *e) ? e : "E:\\Splatoon Games";
+    }
+    gh_romfs_walk(g_romfs_root, 0);
+    /* romfs metadata = one directory entry (0x18) per dir, one file entry
+       (0x20) per file, plus the 0x50 header, 8-byte aligned. */
+    g_romfs_meta = (g_romfs_files * 0x20ull + g_romfs_dirs * 0x18ull + 0x50ull + 7ull) & ~7ull;
+    if (g_romfs_meta < 0x10000ull) g_romfs_meta = 0x10000ull;
+    lg("[romfs] tree '%s': files=%llu dirs=%llu bytes=%llu meta=%llu\n",
+       g_romfs_root, (unsigned long long)g_romfs_files,
+       (unsigned long long)g_romfs_dirs, (unsigned long long)g_romfs_bytes,
+       (unsigned long long)g_romfs_meta);
+    return g_romfs_meta;
+}
+
 void a64_svc(A64Ctx* c, uint64_t imm) {
     c->svc_count++;
     if (imm < 0x400) g_svc_hist[imm]++;
@@ -674,11 +808,11 @@ void a64_svc(A64Ctx* c, uint64_t imm) {
         }
         {
             unsigned n = g_ipc_dump_count(nm);
-            if (n < 3)
+            if (n < 12)
                 lg("[svc] SendSyncRequest(h=%x '%s') x1=%llx x2=%llx hdr=%08x/%08x\n",
                    h, nm, (unsigned long long)c->x[1], (unsigned long long)c->x[2],
                    w0, w4);
-            if (n < 3) {
+            if (n < 12) {
                 dump_tls("req", tls, 80);
                 a64_dbg_parse_hipc(c, tls, "req", nm);
                 dump_fp_chain(c);
@@ -713,92 +847,97 @@ void a64_svc(A64Ctx* c, uint64_t imm) {
                    fsp-srv cmd 3 = QueryPointerBufferSize (u16 out),
                    cmd 0 = ConvertSessionToDomain (returns the object id). */
                 uint32_t cmd = *(uint32_t*)(uintptr_t)(tls + (uint64_t)off + 8);
-                uint32_t oid = (strcmp(nm, "appletOE") == 0 ||
-                                (strcmp(nm, "fsp-srv") == 0 && cmd == 0u))
-                                   ? g_next_objid++ : 0;
-                if (!IsBadWritePtr((void*)(uintptr_t)(tls + (uint64_t)off), 0x18)) {
-                    *(uint32_t*)(uintptr_t)(tls + (uint64_t)off) = 0x4f434653u;
-                    *(uint32_t*)(uintptr_t)(tls + (uint64_t)off + 4) = 1u;
-                    *(uint64_t*)(uintptr_t)(tls + (uint64_t)off + 8) = 0;
-                    if (oid && !IsBadWritePtr((void*)(uintptr_t)(tls + (uint64_t)off + 0x10), 4))
-                        *(uint32_t*)(uintptr_t)(tls + (uint64_t)off + 0x10) = oid;
-                    if (strcmp(nm, "fsp-srv") == 0 && cmd == 3u &&
-                        !IsBadWritePtr((void*)(uintptr_t)(tls + (uint64_t)off + 0x10), 2))
-                        *(uint16_t*)(uintptr_t)(tls + (uint64_t)off + 0x10) = 0x1000u;
-                }
-                if ((*(uint32_t*)(uintptr_t)tls & 0xffffu) == 6u)
-                    gh_hipc_fill_reply(c, tls, off - 0x10, oid);
+                {
+                    uint32_t w1 = *(uint32_t*)(uintptr_t)(tls + 4);
+                    uint32_t tag16 = *(uint32_t*)(uintptr_t)tls & 0xffffu;
+                    uint32_t req_nw = w1 & 0x3ffu;
+                    uint32_t hdr_w2 = *(uint32_t*)(uintptr_t)(tls + 8);
+                    uint32_t hdr_w3 = *(uint32_t*)(uintptr_t)(tls + 12);
+                    int is_desc = (w1 & 0x80000000u) != 0;
+                    int is_fsp = strcmp(nm, "fsp-srv") == 0;
+                    uint32_t oid = (strcmp(nm, "appletOE") == 0 ||
+                                    (is_fsp && cmd == 0u)) ? g_next_objid++ : 0;
+                    uint32_t nw;
+                    int base;
+                    /* A descriptor-carrying request keeps its CMIF packet after
+                       the descriptor list; a reply that carries no buffers must
+                       drop that list, so clear the whole data area first. */
+                    if (is_desc && !IsBadWritePtr((void*)(uintptr_t)(tls + 0x10), 0xf0))
+                        memset((void*)(uintptr_t)(tls + 0x10), 0, 0xf0);
+                    /* Plain messages: the generic sf sender (sdk 0xe850e10)
+                       reads the reply magic at a fixed msg+0x10, and a 2-word
+                       reply header is what nn::sf expects there.
+                       Descriptor-carrying messages: the fs proxy derives the
+                       offset from the header it re-parses, so declare the
+                       request's own word count and ask the parser where it
+                       will look. */
+                    nw = is_desc ? (req_nw ? req_nw : (4u + (oid ? 1u : 0u)))
+                                 : (2u + (oid ? 1u : 0u));
+                    /* Seal the echoed hipc header as a reply before asking the
+                       client-side parser where the CMIF magic belongs: that
+                       offset is derived from this very header. */
+                    *(uint32_t*)(uintptr_t)tls = tag16;
+                    *(uint32_t*)(uintptr_t)(tls + 4) = (nw & 0x3ffu) | 0x400u;
+                    if ((hdr_w2 & 0xffu) != 0) {   /* clone reply: session handle slots */
+                        *(uint32_t*)(uintptr_t)(tls + 8) = hdr_w2 & 0xffu;
+                        *(uint32_t*)(uintptr_t)(tls + 12) = hdr_w3;
+                    }
+                    /* Where the client reads the reply magic (observed, three
+                       message shapes on this boot):
+                         plain cmif packet at msg+0x10  -> magic at 0x10
+                         domain packet at msg+0x20      -> magic at 0x20
+                         packet at msg+0x30 + descriptors -> magic at 0x20
+                       i.e. the magic sits where the request packet was, minus
+                       one 16-byte block when the reply drops the descriptor
+                       list. The parser-derived offset (gh_hipc_reply_base) is
+                       logged alongside and agrees for the descriptor case. */
+                    {   int parsed = gh_hipc_reply_base(c, tls);
+                        int want = gh_hipc_magic_off(c, tls);
+                        /* Put the reply magic where the client's reader looks
+                           for it; fall back to the request-relative rule when
+                           that address is outside the message buffer. */
+                        /* The verified request-relative rule stays the
+                           placement rule; the client-side lookup above is
+                           logged for diagnosis only (it disagrees for plain
+                           messages, where the client reads at msg+0x10). */
+                        base = (int)off - 0x10 - (is_desc ? 0x10 : 0);
+                        if (base < 0) base = 0;
+                        lg("[svc]   base off=%x desc=%d -> base=%x parsed=%x\n", off, is_desc, base, parsed);
+                    }
 
-                if ((strncmp(nm, "applet", 6) == 0 || strcmp(nm, "am") == 0 ||
-                     strcmp(nm, "apm") == 0) &&
-                    !IsBadWritePtr((void*)(uintptr_t)(tls + (uint64_t)off + 0x18), 0x40)) {
-                    memset((void*)(uintptr_t)(tls + (uint64_t)off + 0x18), 0, 0x40);
-                    if (oid) {
-                        /* a domain reply carries the new object id after the
-                           magic/version/result header; sf's Out<> parsers also
-                           read the first inline word, so write both */
-                        *(uint32_t*)(uintptr_t)(tls + (uint64_t)off + 0x10) = oid;
-                        *(uint32_t*)(uintptr_t)(tls + (uint64_t)off + 0x18) = oid;
+                    if (base < 0) base = 0;
+                    lg("[svc]   reply base from req off: off=%x desc=%d base=%x parsed=%x\n",
+                       off, is_desc, base, gh_hipc_reply_base(c, tls));
+                    if (!IsBadWritePtr((void*)(uintptr_t)(tls + (uint64_t)base), 0x40)) {
+                        uint8_t* rp = (uint8_t*)(uintptr_t)(tls + (uint64_t)base);
+                        rp[0x10] = 0x53; rp[0x11] = 0x46; rp[0x12] = 0x43; rp[0x13] = 0x4f;
+                        rp[0x14] = 1; rp[0x15] = 0; rp[0x16] = 0; rp[0x17] = 0;
+                        *(uint32_t*)(rp + 0x18) = 0;
+                        *(uint32_t*)(rp + 0x1c) = 0;
+                        if (oid) *(uint32_t*)(rp + 0x20) = oid;
+                        if (is_fsp && cmd == 3u) *(uint16_t*)(rp + 0x20) = 0x1000u;
+                        /* fsp-srv cmd 0xc8: the mount-cache size the guest
+                           asks for before it mounts rom:. Answered from the
+                           real tree, not a constant (see gh_romfs_meta_size). */
+                        if (is_fsp && cmd == 0xc8u) {
+                            uint64_t mc = gh_romfs_meta_size();
+                            *(uint64_t*)(rp + 0x20) = mc;
+                /* Seal this as a reply the way the accepted fsp-srv replies
+                   are sealed (2 data words, message type 1), so the client's
+                   invoke sees a reply header and not a request header. */
+                *(uint32_t*)(uintptr_t)(tls + 4) = 2u | 0x400u;
+                            lg("[romfs] fsp-srv cmd 0xc8 -> mount cache size %llu\n",
+                               (unsigned long long)mc);
+                        }
+                        if ((strncmp(nm, "applet", 6) == 0 || strcmp(nm, "am") == 0 ||
+                             strcmp(nm, "apm") == 0) && oid &&
+                            !IsBadWritePtr((void*)(uintptr_t)(rp + 0x20), 0x40)) {
+                            memset((void*)(uintptr_t)(rp + 0x20), 0, 0x40);
+                            *(uint32_t*)(rp + 0x20) = oid;
+                        }
                     }
-                }
-                lg("[svc]   cmif reply on '%s': 'SFCO' at tls+0x%x, result 0\n",
-                   nm, off);
-                /* Descriptor-free CMIF reply: the echoed message header still
-                   says "request" (type 0) and carries the request's buffer
-                   counts. Seal it as a reply (type 1) with the same data word
-                   count the client asked for, so ConvertToDomain and every
-                   other descriptor-free command parse. */
-                if ((*(uint32_t*)(uintptr_t)(tls + 4) & 0x80000000u) == 0) {
-                    uint32_t req_nw = *(uint32_t*)(uintptr_t)(tls + 4) & 0x3ffu;
-                    uint32_t hdr_w2 = *(uint32_t*)(uintptr_t)(tls + 8);
-                    uint32_t hdr_w3 = *(uint32_t*)(uintptr_t)(tls + 12);
-                    uint32_t nw = req_nw ? req_nw : (4u + (oid ? 1u : 0u));
-                    *(uint32_t*)(uintptr_t)tls &= 0xffffu;
-                    *(uint32_t*)(uintptr_t)(tls + 4) = (nw & 0x3ffu) | 0x400u;
-                    if ((hdr_w2 & 0xffu) != 0) {   /* clone reply: session handle slots */
-                        *(uint32_t*)(uintptr_t)(tls + 8) = hdr_w2 & 0xffu;
-                        *(uint32_t*)(uintptr_t)(tls + 12) = hdr_w3;
-                    }
-                    a64_dbg_parse_hipc(c, tls, "rep3", nm);
-                }
-                /* Descriptor-carrying request (word1 bit 31): the message
-                   carries a send-static descriptor list at msg+0x10 and the
-                   CMIF packet after it. A reply with no output buffers must
-                   not echo that list, so rebuild the header without
-                   descriptors, put the CMIF packet directly after the 16-byte
-                   header and declare the reply's own length with message
-                   type 1 (bits 10..13). Verified with the guest's own
-                   HipcMessageBufferAccessor::ParseHeader below. */
-                if ((*(uint32_t*)(uintptr_t)(tls + 4) & 0x80000000u) != 0) {
-                    uint8_t pkt[0x40];
-                    uint32_t req_nw = *(uint32_t*)(uintptr_t)(tls + 4) & 0x3ffu;
-                    uint32_t hdr_w2 = *(uint32_t*)(uintptr_t)(tls + 8);
-                    uint32_t hdr_w3 = *(uint32_t*)(uintptr_t)(tls + 12);
-                    /* A reply must be at least as large as the outputs the
-                       client asked for; the request's declared data word
-                       count is exactly that expectation. A 16-byte reply with
-                       no output room makes the client's Out<> parse fail with
-                       a nonzero Result, which is what aborted nnMain in
-                       nn::fs::QueryMountRomCacheSize. */
-                    uint32_t nw = (strcmp(nm, "fsp-srv") == 0 && req_nw >= 6u)
-                                      ? req_nw : (4u + (oid ? 1u : 0u));
-                    memcpy(pkt, (const void*)(uintptr_t)(tls + (uint64_t)off), 0x40);
-                    memset((void*)(uintptr_t)(tls + 0x10), 0, 0x100);
-                    memcpy((void*)(uintptr_t)(tls + 0x10), pkt, 0x10);
-                    if (oid)
-                        *(uint32_t*)(uintptr_t)(tls + 0x20) = oid;
-                    /* No payload is invented here: the request's semantics are
-                       not known for every command, and writing a guessed value
-                       into the reply data corrupts whatever the client reads
-                       (an object id, a size, or an out-param). */
-                    (void)0;
-                    *(uint32_t*)(uintptr_t)tls &= 0xffffu;
-                    *(uint32_t*)(uintptr_t)(tls + 4) = (nw & 0x3ffu) | 0x400u;
-                    if ((hdr_w2 & 0xffu) != 0) {   /* clone reply: session handle slots */
-                        *(uint32_t*)(uintptr_t)(tls + 8) = hdr_w2 & 0xffu;
-                        *(uint32_t*)(uintptr_t)(tls + 12) = hdr_w3;
-                    }
-                    lg("[svc]   descriptor reply rebuilt: nw=%x oid=%x\n", nw, oid);
+                    lg("[svc]   cmif reply on '%s': req pkt tls+0x%x desc=%d nw=%x base=tls+0x%x oid=%x\n",
+                       nm, off, is_desc, nw, base, oid);
                     a64_dbg_parse_hipc(c, tls, "rep2", nm);
                 }
                 /* A real server seals its reply with its own header: the tag
@@ -806,11 +945,6 @@ void a64_svc(A64Ctx* c, uint64_t imm) {
                    word1 declares the CMIF reply length with message type 1.
                    Only do this for messages that carry no buffers/handles,
                    where the shape is unambiguous. */
-                if ((*(uint32_t*)(uintptr_t)tls & 0xfff0ffffu) == 0 &&
-                    ((*(uint32_t*)(uintptr_t)(tls + 4)) & 0x80000000u) == 0) {
-                    uint32_t nwords = (uint32_t)(off / 4) - 4u + 2u + (oid ? 1u : 0u);
-                    *(uint32_t*)(uintptr_t)(tls + 4) = (nwords & 0x3ffu) | 0x400u;
-                }
                 dump_tls("rep", tls, 60);
                 a64_dbg_parse_hipc(c, tls, "rep", nm);
                 c->x[0] = 0;
@@ -840,6 +974,33 @@ void a64_svc(A64Ctx* c, uint64_t imm) {
            then re-parsed a wiped buffer and produced the client's own
            0x1a80a reply-magic error. Echo the request and only write the
            Result the SDK reads at tls+8. */
+        {   int want = gh_hipc_magic_off(c, tls);
+            /* fsp-srv query with no CMIF packet: the client's cmif reader
+               still expects a reply packet whose magic sits at
+               align16(ptr + desc_count*4) + 0x10, and its payload follows at
+               packet+0x20.  That query is QueryMountRomCacheSize, so answer it
+               with the size measured from the real romfs tree. */
+            if (strcmp(nm, "fsp-srv") == 0 && want >= 0 && want <= 0x3c0 &&
+                !IsBadWritePtr((void*)(uintptr_t)tls, 0x60)) {
+                /* fsp-srv query with no CMIF packet on the wire: this is the
+                   storage/size query under nn::fs::QueryMountRomCacheSize.
+                   Answer it at the offset the client-side lookup reports,
+                   from the real romfs tree. */
+                uint64_t mc = gh_romfs_meta_size();
+                *(uint32_t*)(uintptr_t)(tls + (uint64_t)want + 0x10) = 0x4f434653u;
+                *(uint32_t*)(uintptr_t)(tls + (uint64_t)want + 0x14) = 1;
+                *(uint32_t*)(uintptr_t)(tls + (uint64_t)want + 0x18) = 0;
+                *(uint32_t*)(uintptr_t)(tls + (uint64_t)want + 0x1c) = 0;
+                *(uint64_t*)(uintptr_t)(tls + (uint64_t)want + 0x20) = mc;
+                *(uint32_t*)(uintptr_t)(tls + 4) = 2u | 0x400u;
+                lg("[romfs] fsp-srv size query: SFCO at tls+%x sizes at tls+%x -> %llu\n",
+                   want + 0x10, want + 0x20, (unsigned long long)mc);
+                dump_tls("rep", tls, 16);
+                (void)gh_hipc_magic_off(c, tls);
+                c->x[0] = 0;
+                return;
+            }
+        }
         if (!IsBadWritePtr((void*)(uintptr_t)(tls + 8), 4))
             *(uint32_t*)(uintptr_t)(tls + 8) = 0;
         lg("[svc]   sm reply on '%s': Result 0 at tls+8 (request echoed)\n", nm);
@@ -944,6 +1105,7 @@ void a64_svc(A64Ctx* c, uint64_t imm) {
         dump_fp_chain(c);
     dump_stack32(c);
     a64_dump_trace();
+    if (getenv("SN_BIGTRACE")) a64_dump_bigtrace(24000);
     }
     c->x[0] = 0;   /* default: Result success for unmodelled services */
 }
@@ -1102,6 +1264,22 @@ uint32_t a64_crc32(const char* name, uint32_t a, uint32_t b) {
    the access before it happens. */
 void a64_small_addr_dbg(A64Ctx* c, uint64_t a, int wr, int n) {
     static int seen = 0;
+    /* A genuinely unmapped low address cannot be tolerated: the load/store
+       that follows this hook would take the whole process down with a host
+       access violation and lose the guest pc. Report it as a guest fault and
+       stop the run cleanly instead (exit code 0, same shape as an abort). */
+    if (a < 0x1000ull &&
+        (wr ? IsBadWritePtr((void*)(uintptr_t)a, (size_t)n)
+            : IsBadReadPtr((const void*)(uintptr_t)a, (size_t)n))) {
+        lg("[mem] guest fault: unmapped %s a=%llx n=%d pc=%llx lr=%llx\n",
+           wr ? "wr" : "rd", (unsigned long long)a, n,
+           (unsigned long long)c->pc, (unsigned long long)c->x[30]);
+        dump_fp_chain(c);
+        a64_dump_trace();
+        lg("[done] exit\n");
+        fflush(g_log);
+        ExitProcess(0);
+    }
     if (seen > 40) return;
     seen++;
     lg("[mem] SMALL %s a=%llx n=%d pc=%llx lr=%llx sp=%llx x0=%llx x1=%llx x2=%llx x19=%llx x20=%llx\n",

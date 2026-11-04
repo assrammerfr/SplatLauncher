@@ -38,6 +38,10 @@ extern const unsigned long long g_init_arrays[][2];
 extern const unsigned long long g_entry;
 
 void fn_dispatch(A64Ctx* c);
+void a64_trace_pc(A64Ctx* c, uint64_t tag);
+void a64_dbg_allocmgr(uint64_t tag, uint64_t p);
+void a64_dbg_tls(uint64_t tag, A64Ctx* c);
+void a64_str_dbg(const char* tag, uint64_t p);
 /* Returns 1 if pc was a host (runtime) function and ran it (see nso_loader.c). */
 int host_dispatch(A64Ctx* c);
 
@@ -47,7 +51,7 @@ void a64_break(A64Ctx* c, uint64_t pc, uint64_t word);
 void a64_undef(A64Ctx* c, uint64_t pc, uint64_t word, const char* mn);
 void a64_unmapped(A64Ctx* c);
 /* Function-level call trace ring (fn_dispatch pushes pc; dumped on stop). */
-extern uint64_t g_trace[1024];
+extern uint64_t g_trace[262144];
 extern unsigned g_trace_i;
 void a64_dump_trace(void);
 /* pc watch (fn_dispatch calls a64_hit_watch when pc == g_watch). */
@@ -95,15 +99,32 @@ static inline int a64_cond(A64Ctx* c, int cond) {
     return r;
 }
 
-static inline uint64_t a64lsl64(uint64_t v, uint64_t n) { return v << (n & 63); }
-static inline uint32_t a64lsl32(uint32_t v, uint32_t n) { return v << (n & 31); }
-static inline uint64_t a64lsr64(uint64_t v, uint64_t n) { return v >> (n & 63); }
-static inline uint32_t a64lsr32(uint32_t v, uint32_t n) { return v >> (n & 31); }
+/* AArch64 variable shifts (LSLV/LSRV/ASRV) shift the whole register by n; when
+   n >= the register width the result is all shifted out (0 for LSLV/LSRV,
+   sign-fill for ASRV). Masking n is wrong here: the SDK heap computes
+   `1ull << size_log2` for block sizes whose log2 exceeds 64 and relies on the
+   zero result, so the masked form produced a bogus bit set (observed:
+   0x008000008fb80a40 written into CentralHeap's freelist). RORV genuinely uses
+   `n & 63`, so a64ror64 keeps the mask. */
+static inline uint64_t a64lsl64(uint64_t v, uint64_t n) {
+    return n >= 64 ? 0ull : v << n;
+}
+static inline uint32_t a64lsl32(uint32_t v, uint32_t n) {
+    return n >= 32 ? 0u : v << n;
+}
+static inline uint64_t a64lsr64(uint64_t v, uint64_t n) {
+    return n >= 64 ? 0ull : v >> n;
+}
+static inline uint32_t a64lsr32(uint32_t v, uint32_t n) {
+    return n >= 32 ? 0u : v >> n;
+}
 static inline uint64_t a64asr64(uint64_t v, uint64_t n) {
-    return (uint64_t)((int64_t)v >> (n & 63));
+    if (n >= 64) return (uint64_t)((int64_t)v >> 63);
+    return (uint64_t)((int64_t)v >> n);
 }
 static inline uint32_t a64asr32(uint32_t v, uint32_t n) {
-    return (uint32_t)((int32_t)v >> (n & 31));
+    if (n >= 32) return (uint32_t)((int32_t)v >> 31);
+    return (uint32_t)((int32_t)v >> n);
 }
 static inline uint64_t a64ror64(uint64_t v, uint64_t n) {
     n &= 63; if (!n) return v;
@@ -153,29 +174,75 @@ static inline uint64_t a64_umulh(uint64_t a, uint64_t b) {
     return p3 + (p1 >> 32) + (p2 >> 32) + (mid >> 32);
 }
 
+/* store watch (diagnostic): fires when a watched address is written */
+extern uint64_t g_st_watch1, g_st_watch2;
+void a64_st_watch_hit(A64Ctx* c, uint64_t a, uint64_t v, int size);
+
 /* ---- memory (guest image is mapped at its absolute load address) ---- */
+/* Diagnostic address guard: a guest access to a non-guest address (above
+   0x7fffffffff, e.g. a -1 left in a pointer register) would otherwise fault
+   inside the generated C with no way to name the instruction. Enabled with
+   -DA64_ADDR_GUARD on diagnostic builds only; logs and stops. */
+#ifdef A64_ADDR_GUARD
+void a64_bad_addr_dbg(A64Ctx* c, uint64_t a, int wr);
+#define A64_ADDR_CHK(c, a, wr)                                              \
+    do { if ((a) >> 39) a64_bad_addr_dbg((c), (a), (wr)); } while (0)
+#else
+#define A64_ADDR_CHK(c, a, wr) do { } while (0)
+#endif
+
+/* diagnostic: a guest access below 0x1000 is almost always a null-pointer
+   bug in the guest, and the host fault loses the guest pc. Log it. */
+void a64_small_addr_dbg(A64Ctx* c, uint64_t a, int wr, int bytes);
+#define A64_SMALL_CHK(c, a, wr, n)                                          \
+    do { if ((uint64_t)(a) < 0x1000ull) a64_small_addr_dbg((c), (uint64_t)(a), (wr), (n)); } while (0)
+
 static inline uint64_t ld8(A64Ctx* c, uint64_t a) {
+    A64_ADDR_CHK(c, a, 0);
+    A64_SMALL_CHK(c, a, 0, 1);
     (void)c; return *(const uint8_t*)(uintptr_t)a;
 }
 static inline uint64_t ld16(A64Ctx* c, uint64_t a) {
+    A64_ADDR_CHK(c, a, 0);
+    A64_SMALL_CHK(c, a, 0, 2);
     (void)c; return *(const uint16_t*)(uintptr_t)a;
 }
 static inline uint64_t ld32(A64Ctx* c, uint64_t a) {
+    A64_ADDR_CHK(c, a, 0);
+    A64_SMALL_CHK(c, a, 0, 4);
     (void)c; return *(const uint32_t*)(uintptr_t)a;
 }
 static inline uint64_t ld64(A64Ctx* c, uint64_t a) {
+    A64_ADDR_CHK(c, a, 0);
+    A64_SMALL_CHK(c, a, 0, 8);
     (void)c; return *(const uint64_t*)(uintptr_t)a;
 }
 static inline void st8(A64Ctx* c, uint64_t a, uint64_t v) {
+    A64_ADDR_CHK(c, a, 1);
+    A64_SMALL_CHK(c, a, 1, 1);
+    extern uint64_t g_st_watch1, g_st_watch2;
+    if (g_st_watch1 && a < g_st_watch1 + 8 && a + 1 > g_st_watch1) a64_st_watch_hit(c, a, v, 1);
     (void)c; *(uint8_t*)(uintptr_t)a = (uint8_t)v;
 }
 static inline void st16(A64Ctx* c, uint64_t a, uint64_t v) {
+    A64_ADDR_CHK(c, a, 1);
+    A64_SMALL_CHK(c, a, 1, 2);
+    extern uint64_t g_st_watch1, g_st_watch2;
+    if (g_st_watch1 && a < g_st_watch1 + 8 && a + 2 > g_st_watch1) a64_st_watch_hit(c, a, v, 2);
     (void)c; *(uint16_t*)(uintptr_t)a = (uint16_t)v;
 }
 static inline void st32(A64Ctx* c, uint64_t a, uint64_t v) {
+    A64_ADDR_CHK(c, a, 1);
+    A64_SMALL_CHK(c, a, 1, 4);
+    extern uint64_t g_st_watch1, g_st_watch2;
+    if (g_st_watch1 && a < g_st_watch1 + 8 && a + 4 > g_st_watch1) a64_st_watch_hit(c, a, v, 4);
     (void)c; *(uint32_t*)(uintptr_t)a = (uint32_t)v;
 }
 static inline void st64(A64Ctx* c, uint64_t a, uint64_t v) {
+    A64_ADDR_CHK(c, a, 1);
+    A64_SMALL_CHK(c, a, 1, 8);
+    extern uint64_t g_st_watch1, g_st_watch2;
+    if (g_st_watch1 && a < g_st_watch1 + 8 && a + 8 > g_st_watch1) a64_st_watch_hit(c, a, v, 8);
     (void)c; *(uint64_t*)(uintptr_t)a = v;
 }
 
@@ -1692,5 +1759,19 @@ static inline V128 v_sqshl_u32(V128 a, int n) {
 /* ---- FMOV vector immediates (broadcast of a 64-bit pattern) ---- */
 static inline V128 v_fmov_imm_u64(uint64_t bits) { V128 r; r.lo = bits; r.hi = bits; return r; }
 static inline V128 v_fmov_imm_u32(uint32_t bits) { V128 r; r.lo = (uint64_t)bits | ((uint64_t)bits << 32); r.hi = r.lo; return r; }
+
+void a64_log_range(A64Ctx* c);
+
+void a64_log_throw(A64Ctx* c);
+
+void a64_log_arb(A64Ctx* c);
+
+void a64_log_sm(A64Ctx* c, int tag);
+void a64_log_probe(A64Ctx* c, int tag);
+void a64_log_globals(const char* why);
+void a64_dump_mem(const char* tag, uint64_t addr, int words);
+void a64_st_watch_hit(A64Ctx* c, uint64_t a, uint64_t v, int size);
+void a64_log6(A64Ctx* c, int tag, uint64_t a, uint64_t b, uint64_t d, uint64_t e, uint64_t f);
+void a64_log_fsalloc(A64Ctx* c);
 
 #endif /* A64_CTX_H */

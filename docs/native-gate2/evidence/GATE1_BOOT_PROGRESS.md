@@ -356,3 +356,161 @@ SN_ENTRY=osinit ./build/splatnative.exe              # 9.3k lines, fast
 SN_ENTRY=osinit SN_TRACE_ALL=1 ./build/splatnative.exe  # full 148k-entry call history
 grep -n "\[trace\]   <pc>" <log>                      # where a function is entered, in order
 ```
+
+### 9.8 FIXED: the CMIF reply position (this was the whole `0x1a80a` class of failure)
+
+`0x1a80a` (nn::sf "invalid response") was never a service-semantics problem. It is produced by
+`nn::sf` when the reply magic is not `SFCO` at the offset the client decodes. Two facts pinned it:
+
+1. The failing call chain was `nn::fs::QueryMountRomCacheSize` -> `GetFileSystemProxyServiceObject`
+   create path -> `0xe7c441c(proxy+8, 0, 1)`, whose only `0x1a80a` assignment is the
+   "reply magic mismatch" arm at `0xe7c4518`. The BREAK payload recorded in the log
+   (`x1 u32=0001a80a`) is that same Result.
+2. The client does NOT read the magic where we wrote it. It re-parses the echoed hipc header with
+   sdk `0xe799a5c`, which stores a packed HeaderInfo at struct+0x1a; the top byte of that word
+   (struct+0x21) is a word count, and the client reads the magic at
+   `align(msg + count*4) + 0x10`.
+
+The reply builder used the *request's* packet offset for the reply. For a descriptor-carrying
+request the packet sits at `msg+0x30`, so `SFCO` landed at `msg+0x40` while the client looked at
+`msg+0x20`. For the fs proxy's own domain message (packet at `msg+0x20`) it landed at `0x30`
+instead of `0x20`. Observed shapes and the rule now implemented:
+
+| request packet | descriptors | reply magic goes at |
+|---|---|---|
+| `msg+0x10` (plain cmif, e.g. fsp-srv cmd 3) | no | `msg+0x10` |
+| `msg+0x10` (plain cmif, e.g. fsp-srv cmd 0 ConvertToDomain) | no | `msg+0x10` |
+| `msg+0x30` (packet after a 0x20-byte descriptor list) | yes | `msg+0x20` |
+| `msg+0x20` (factory/domain message) | no | `msg+0x20` |
+
+i.e. the magic goes where the request packet was, minus one 16-byte block when the reply drops the
+descriptor list. The descriptor data area is zeroed, the echoed header is resealed as a reply
+(`word1 = (nw & 0x3ff) | (1<<10)`, bit 31 clear) *before* the offset is derived, and the parser's
+own answer (`gh_hipc_reply_base`, sdk `0xe799a5c`) is logged next to it.
+
+Result on this boot (plain `SN_ENTRY=osinit`, log `boot_20261104_014905.log`):
+
+```
+[svc]   reply base from req off: off=10 desc=0 base=0  parsed=0
+[svc]   cmif reply on 'fsp-srv': req pkt tls+0x10 desc=0 nw=2 base=tls+0x0  oid=0
+[svc]   cmif reply on 'fsp-srv': req pkt tls+0x10 desc=0 nw=3 base=tls+0x0  oid=100   (ConvertToDomain)
+[svc]   cmif reply on 'fsp-srv': req pkt tls+0x30 desc=1 nw=e base=tls+0x10 oid=0
+[svc]   cmif reply on 'fsp-srv': req pkt tls+0x20 desc=0 nw=2 base=tls+0x10 oid=0     (cmd 0xc8)
+```
+
+4 CMIF replies, all parsing `type=01`, no retry loops, and **`0x1a80a` is gone from the log**.
+`nn::fs::QueryMountRomCacheSize` now returns from its proxy call instead of aborting.
+
+### 9.9 New stop point: fs still needs a real romfs (this is the gate blocker)
+
+With the reply protocol correct, the very next step dereferences data the romfs reply should have
+produced. The run now stops on a genuine guest null dereference, reported precisely and cleanly:
+
+```
+[mem] guest fault: unmapped rd a=0 n=8 pc=e7b7f44 lr=e7f6e74
+[fp] chain ... lr=ca2c97c (main) ...
+[done] exit
+```
+
+`0xe7b7f44` is a forwarding stub (`impl = [this+8]; impl->vtable[0x20](...)`) and `this+8` is null:
+the object the fs layer built from the (correctly) zeroed cache-size reply has no implementation
+attached. That is the honest consequence of returning a well-formed success with zeroed output for
+a query whose real answer lives in the game's romfs.
+
+`a64_small_addr_dbg` now converts an unmapped low-address access into that logged guest fault and a
+clean `exit 0` with the trace dumped, instead of letting the host take an access violation (the
+previous behaviour segfaulted here with exit code 139).
+
+To go further the runtime has to serve the real content: mount `rom:` from the game folder
+(`E:\Splatoon Games\`), answer the mount-cache query with the real cache size, and hand back real
+file bytes for the first requested path. That is the deferred "step 2" and it is the current gate
+blocker on the guest side.
+
+### 9.10 Offline GOT/thunk resolver (new tool)
+
+`tools/slotaddr.py` resolves a GOT slot to its linked target from the MOD0 relocation tables, which
+finally names the whole thunk region (`0xed4....`) that dynsym cannot resolve:
+
+```
+python tools/slotaddr.py 0xf26d8f0 0xf26cd58 0xf26c708
+f26d8f0: type=0x402 name=_ZN2nn2sf4hipc6client24HipcClientSessionManager16CreateNewSessionEPNS_3svc6HandleE target=0xe85022c
+f26cd58: type=0x402 name=_ZN2nn2sf4hipc20ConnectToHipcServiceEPNS_3svc6HandleEPKc target=0xe856fa0
+f26c708: type=0x402 name=_ZN2nn4diag6detail9AbortImplEPKNS_6ResultE target=0xe799ee0
+```
+
+This is what identified `0xed45320` as `__cxa_guard_acquire` (the "fs init Once" at `0xf288400` is
+really a C++ static-init guard), `0xed47f60` as `HipcClientSessionManager::CreateNewSession`
+(never called on this boot) and `0xed45b90` as `nn::diag::detail::AbortImpl`.
+
+### 9.11 romfs content model wired in (Step 1 progress)
+
+`gh_romfs_meta_size()` measures the local extracted tree once at first use
+(`SN_ROMFS`, default `E:\Splatoon Games`) and answers fsp-srv cmd 0xc8 with a
+real derived mount-cache size. Verified `boot_20261104_111637.log` (9332 lines,
+422,896 B): files=23425 dirs=169 bytes=39,660,698,754 meta=753736, and
+`[romfs] fsp-srv cmd 0xc8 -> mount cache size 753736`. The guest then creates a
+second fs object (oid=101) instead of faulting at `e7b7f44` - that null-forwarder
+stop is closed.
+
+Next stop: the domain reply for that oid=101 message (request packet at
+`msg+0x30`, no descriptors) still yields `0x1a80a` at `e7e1d84`
+(QueryMountRomCacheSize). Using the header parser's own offset for that message
+gets past it but sends the guest into an unbounded appletOE object-creation loop
+(12.8M-line log, `boot_20261104_111356.log`, killed at 120 s), so the parser
+offset alone is not the rule either - the domain reply needs its own
+object-id/scaling semantics (likely the sf `Out` object table entry), which is
+the next item.
+
+## 10. NVN -> DX12 stack: D3D12 half built and verified (Step 3 started)
+
+`src/runtime/nvn_d3d12.cpp` (new TU, wired into `tools/build.py` with
+d3d12/dxgi/d3dcompiler/user32/gdi32/ole32) is the bottom half of the graphics
+stack the NVN layer will drive: D3D12 device on the real adapter, a
+flip-model DXGI swapchain on a real window, RTV heap, command allocator/list,
+fence, and the per-frame CSV recorder.  The NVN API surface (device / window /
+swapchain / command buffer / present) will be implemented on top of exactly
+these calls, so anything reaching NVN presents through this file; that API
+surface itself is NOT written yet - this commit is the D3D12 half only.
+
+Verified on this machine (`SN_NVN_SMOKE=60`, log `boot_20261104_114647.log`):
+```
+[dx12] window 1280x720 hwnd=0000000001840DBE
+[dx12] adapter: AMD Radeon RX 5700 XT
+[dx12] device ready: queue=fence ok, swapchain 1280x720 x2
+[dx12] init rc=0
+[dx12] smoke frames=60 csv=bench_20261104_114648.csv
+[dx12] CSV closed: bench_20261104_114648.csv (60 frames, 60 presents)
+```
+`bench_20261104_114648.csv`, 2025 B, 60 data rows, header
+`frame,frame_time_us,cpu_time_us,draw_calls,presents,width,height`, first row
+`1,58584.5,58584.5,0,1,1280,720`.  Every row is written after
+ExecuteCommandLists+Present returned for that frame; the smoke colour is not
+the title, so this is the pipeline proof, not a Gate 2 pass.
+
+## 11. Diagnostic tools added (runtime only, no gen changes)
+
+- `SN_MARK=<hex>`: log registers + the pc ring at one address and stop.  Only
+  block-entry addresses fire (dispatch is per basic block), so mid-function
+  probes miss.
+- `SN_COV=<lo>-<hi>`: one `[cov]` line per distinct dispatched pc in a range.
+- `SN_BIGTRACE=1`: a 65536-entry pc ring maintained in `host_dispatch`
+  (runtime side; the generated ring is only 1024 and its dump mask was
+  mismatched, so it printed zeros - fixed to read the same ring it writes).
+- `a64_dump_trace` mask fix and `gh_hipc_magic_off`, which replays the client's
+  own check (`sdk 0xe799a2c`/`0xe7c44d8`): magic must equal 0x4f434653 at
+  `align16(parse_state.ptr + count*4) + 0x10`, and 0x1a80a is what the SDK
+  returns when that compare fails.
+
+## 12. Current stop (unchanged, now instrumented)
+
+The no-`SFCI` fsp-srv message that follows `QueryMountRomCacheSize`'s size
+query is answered at the offset the client-side lookup reports
+(`[romfs] fsp-srv size query: SFCO at tls+%x sizes at tls+%x`), and that
+lookup then reports the magic present and correct
+(`[hipc] magic lookup: ... magic=4f434653 OK`), yet the call still returns
+0x1a80a and `QueryMountRomCacheSize` aborts at `e7e1d84`.  Planting the magic
+at 0x10/0x20/0x30/0x40 in one run changed nothing, so this message's rejection
+is not the reply-magic compare; the bigtrace shows the failing work happening
+after the reply parse (`e7d6170`, `e7d52e0`) inside the mount attempt, before
+`e7f445c` aborts.  Next: identify what that mount call wants (its payload
+carries the 753736 cache size twice) instead of the magic.
